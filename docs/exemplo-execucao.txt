@@ -1,0 +1,52 @@
+Motor: [pasta-do-projeto]/build/linux/bin/engines/stockfish
+Voce joga de brancas (MAIUSCULAS); Stockfish de pretas (minusculas).
+P=peao N=cavalo B=bispo R=torre Q=dama K=rei
+Lances: e2e4, g1f3; roque e1g1/e1c1; promocao e7e8q.
+Comandos: lances, fen, novo, ajuda, sair.
+
+    a b c d e f g h
+  +-----------------+
+8 | r n b q k b n r | 8
+7 | p p p p p p p p | 7
+6 | . . . . . . . . | 6
+5 | . . . . . . . . | 5
+4 | . . . . . . . . | 4
+3 | . . . . . . . . | 3
+2 | P P P P P P P P | 2
+1 | R N B Q K B N R | 1
+  +-----------------+
+    a b c d e f g h
+
+Seu lance> Movimento invalido => nullptr. Tabuleiro mantido.
+Seu lance> rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1
+Seu lance> Stockfish respondeu: e7e5
+
+    a b c d e f g h
+  +-----------------+
+8 | r n b q k b n r | 8
+7 | p p p p . p p p | 7
+6 | . . . . . . . . | 6
+5 | . . . . p . . . | 5
+4 | . . . . P . . . | 4
+3 | . . . . . . . . | 3
+2 | P P P P . P P P | 2
+1 | R N B Q K B N R | 1
+  +-----------------+
+    a b c d e f g h
+
+Seu lance> rnbqkbnr/pppp1ppp/8/4p3/4P3/8/PPPP1PPP/RNBQKBNR w KQkq - 0 2
+Seu lance> 
+    a b c d e f g h
+  +-----------------+
+8 | r n b q k b n r | 8
+7 | p p p p p p p p | 7
+6 | . . . . . . . . | 6
+5 | . . . . . . . . | 5
+4 | . . . . . . . . | 4
+3 | . . . . . . . . | 3
+2 | P P P P P P P P | 2
+1 | R N B Q K B N R | 1
+  +-----------------+
+    a b c d e f g h
+
+Seu lance> Ate mais!

@@ -1,0 +1,8 @@
+build/
+bin/
+obj/
+.cache/
+__pycache__/
+*.layout
+*.depend
+

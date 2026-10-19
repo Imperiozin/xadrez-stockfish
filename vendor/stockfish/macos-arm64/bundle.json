@@ -1,0 +1,6 @@
+{
+  "platform": "macos-arm64",
+  "version": "17.1",
+  "url": "https://github.com/official-stockfish/Stockfish/releases/download/sf_17.1/stockfish-macos-m1-apple-silicon.tar",
+  "sha256": "9345c44970093cabed9757be86a9ca86809a5b6ca1bdc654cf51a5eed7568858"
+}

@@ -1,0 +1,6 @@
+{
+  "platform": "linux-x64",
+  "version": "17.1",
+  "url": "https://github.com/official-stockfish/Stockfish/releases/download/sf_17.1/stockfish-ubuntu-x86-64.tar",
+  "sha256": "4e7507c0b1d3a3020e16b212101c0ba8c8cbff5ea87764bd56301c7d53bfa10c"
+}

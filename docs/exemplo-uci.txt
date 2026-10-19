@@ -1,0 +1,54 @@
+>> uci
+<< Stockfish 17.1 by the Stockfish developers (see AUTHORS file)
+<< id name Stockfish 17.1
+<< id author the Stockfish developers (see AUTHORS file)
+<< 
+<< option name Debug Log File type string default <empty>
+<< option name NumaPolicy type string default auto
+<< option name Threads type spin default 1 min 1 max 1024
+<< option name Hash type spin default 16 min 1 max 33554432
+<< option name Clear Hash type button
+<< option name Ponder type check default false
+<< option name MultiPV type spin default 1 min 1 max 256
+<< option name Skill Level type spin default 20 min 0 max 20
+<< option name Move Overhead type spin default 10 min 0 max 5000
+<< option name nodestime type spin default 0 min 0 max 10000
+<< option name UCI_Chess960 type check default false
+<< option name UCI_LimitStrength type check default false
+<< option name UCI_Elo type spin default 1320 min 1320 max 3190
+<< option name UCI_ShowWDL type check default false
+<< option name SyzygyPath type string default <empty>
+<< option name SyzygyProbeDepth type spin default 1 min 1 max 100
+<< option name Syzygy50MoveRule type check default true
+<< option name SyzygyProbeLimit type spin default 7 min 0 max 7
+<< option name EvalFile type string default nn-1c0000000000.nnue
+<< option name EvalFileSmall type string default nn-37f18f62d772.nnue
+<< uciok
+>> setoption name Threads value 1
+>> setoption name Hash value 16
+>> setoption name Skill Level value 5
+>> isready
+<< info string Using 1 thread
+<< readyok
+>> ucinewgame
+>> isready
+<< readyok
+>> position startpos moves e2e4
+>> go movetime 50
+<< info string Available processors: 0-8
+<< info string Using 1 thread
+<< info string NNUE evaluation using nn-1c0000000000.nnue (133MiB, (22528, 3072, 15, 32, 1))
+<< info string NNUE evaluation using nn-37f18f62d772.nnue (6MiB, (22528, 128, 15, 32, 1))
+<< info depth 1 seldepth 4 multipv 1 score cp -27 nodes 114 nps 114000 hashfull 0 tbhits 0 time 1 pv e7e5
+<< info depth 2 seldepth 3 multipv 1 score cp -20 nodes 240 nps 240000 hashfull 0 tbhits 0 time 1 pv e7e5
+<< info depth 3 seldepth 6 multipv 1 score cp -7 nodes 363 nps 363000 hashfull 0 tbhits 0 time 1 pv e7e5
+<< info depth 4 seldepth 5 multipv 1 score cp -8 nodes 897 nps 299000 hashfull 0 tbhits 0 time 3 pv e7e5 d2d4 e5d4 d1d4
+<< info depth 5 seldepth 7 multipv 1 score cp -8 nodes 1816 nps 454000 hashfull 0 tbhits 0 time 4 pv c7c6 d2d4 d7d5 e4d5 c6d5
+<< info depth 6 seldepth 8 multipv 1 score cp -11 nodes 3943 nps 492875 hashfull 0 tbhits 0 time 8 pv e7e6 d2d4 d7d5 b1d2
+<< info depth 7 seldepth 12 multipv 1 score cp -33 nodes 7447 nps 531928 hashfull 1 tbhits 0 time 14 pv e7e5 g1f3 b8c6 d2d4 e5d4 f3d4
+<< info depth 8 seldepth 12 multipv 1 score cp -36 nodes 13019 nps 566043 hashfull 2 tbhits 0 time 23 pv e7e5 g1f3 b8c6 d2d4 e5d4 f3d4 f8c5 d4c6 d7c6 d1d8 e8d8
+<< info depth 9 seldepth 16 multipv 1 score cp -41 nodes 25086 nps 501720 hashfull 4 tbhits 0 time 50 pv e7e5 g1f3 b8c6 d2d4 e5d4 f3d4 f8c5
+<< bestmove e7e5 ponder g1f3
+>> ucinewgame
+>> isready
+<< readyok

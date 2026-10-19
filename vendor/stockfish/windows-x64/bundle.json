@@ -1,0 +1,6 @@
+{
+  "platform": "windows-x64",
+  "version": "17.1",
+  "url": "https://github.com/official-stockfish/Stockfish/releases/download/sf_17.1/stockfish-windows-x86-64.zip",
+  "sha256": "55aa40c857de30b79dbe4f8e4c335ee2b23815cf2f100a6630d54761fcad3b85"
+}

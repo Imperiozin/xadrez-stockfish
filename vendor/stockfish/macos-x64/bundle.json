@@ -1,0 +1,6 @@
+{
+  "platform": "macos-x64",
+  "version": "17.1",
+  "url": "https://github.com/official-stockfish/Stockfish/releases/download/sf_17.1/stockfish-macos-x86-64.tar",
+  "sha256": "4167f9489e6d5230723c969a6d29e23c825fd8a1268ce6b32e0d7687d476b22e"
+}
