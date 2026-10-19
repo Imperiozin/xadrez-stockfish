@@ -1,6 +1,7 @@
 build/
 bin/
 obj/
+docs/
 .cache/
 __pycache__/
 *.layout
