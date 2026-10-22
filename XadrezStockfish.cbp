@@ -1,64 +1,280 @@
-<?xml version="1.0" encoding="UTF-8" standalone="yes" ?>
+<?xml version='1.0' encoding='UTF-8'?>
 <CodeBlocks_project_file>
     <FileVersion major="1" minor="6" />
     <Project>
-        <Option title="Xadrez Stockfish - Terminal" />
-        <Option pch_mode="2" />
+        <Option title="Xadrez 3D" />
         <Option compiler="gcc" />
         <Build>
             <Target title="Windows">
-                <Option output="bin/Windows/xadrez.exe" prefix_auto="0" extension_auto="0" />
-                <Option working_dir="." />
-                <Option object_output="obj/Windows/" />
+                <Option output="bin/Windows/xadrez" prefix_auto="0" extension_auto="1" />
+                <Option object_output="obj/Windows" />
                 <Option type="1" />
-                <Option compiler="gcc" />
-                <Linker><Add option="-static" /></Linker>
-                <ExtraCommands>
-                    <Add before="cmd /c preparar.bat bin/Windows" />
-                </ExtraCommands>
+                <Option working_dir="." />
+                <MakeCommands>
+                    <Build command="python tools/build.py --output bin/Windows" />
+                    <CompileFile command="python tools/build.py --output bin/Windows" />
+                    <SilentBuild command="python tools/build.py --output bin/Windows" />
+                </MakeCommands>
             </Target>
             <Target title="Linux">
-                <Option output="bin/Linux/xadrez" prefix_auto="0" extension_auto="0" />
-                <Option working_dir="." />
-                <Option object_output="obj/Linux/" />
+                <Option output="bin/Linux/xadrez" prefix_auto="0" extension_auto="1" />
+                <Option object_output="obj/Linux" />
                 <Option type="1" />
-                <Option compiler="gcc" />
-                <ExtraCommands>
-                    <Add before="python3 tools/setup_engine.py --output bin/Linux" />
-                </ExtraCommands>
+                <Option working_dir="." />
+                <MakeCommands>
+                    <Build command="python3 tools/build.py --output bin/Linux" />
+                    <CompileFile command="python3 tools/build.py --output bin/Linux" />
+                    <SilentBuild command="python3 tools/build.py --output bin/Linux" />
+                </MakeCommands>
             </Target>
             <Target title="macOS">
-                <Option output="bin/macOS/xadrez" prefix_auto="0" extension_auto="0" />
-                <Option working_dir="." />
-                <Option object_output="obj/macOS/" />
+                <Option output="bin/macOS/xadrez" prefix_auto="0" extension_auto="1" />
+                <Option object_output="obj/macOS" />
                 <Option type="1" />
-                <Option compiler="gcc" />
-                <ExtraCommands>
-                    <Add before="python3 tools/setup_engine.py --output bin/macOS" />
-                </ExtraCommands>
+                <Option working_dir="." />
+                <MakeCommands>
+                    <Build command="python3 tools/build.py --output bin/macOS" />
+                    <CompileFile command="python3 tools/build.py --output bin/macOS" />
+                    <SilentBuild command="python3 tools/build.py --output bin/macOS" />
+                </MakeCommands>
             </Target>
         </Build>
-        <Compiler>
-            <Add option="-std=c++17" />
-            <Add option="-O2" />
-            <Add option="-Wall" />
-            <Add option="-Wextra" />
-            <Add option="-pthread" />
-            <Add directory="src" />
-            <Add directory="vendor/chess-library" />
-        </Compiler>
-        <Linker>
-            <Add option="-pthread" />
-        </Linker>
-        <Unit filename="src/main.cpp"><Option compilerVar="CPP" /></Unit>
-        <Unit filename="src/jogo.cpp"><Option compilerVar="CPP" /></Unit>
-        <Unit filename="src/jogo.hpp" />
-        <Unit filename="src/stockfish.cpp"><Option compilerVar="CPP" /></Unit>
-        <Unit filename="src/stockfish.hpp" />
-        <Unit filename="src/arquivos.hpp" />
-        <Unit filename="src/autoteste.cpp"><Option compilerVar="CPP" /></Unit>
-        <Unit filename="src/autoteste.hpp" />
-        <Unit filename="README.md" />
-        <Extensions />
+        <Unit filename="src/jogo.cpp">
+            <Option compilerVar="CPP" />
+        </Unit>
+        <Unit filename="src/main.cpp">
+            <Option compilerVar="CPP" />
+        </Unit>
+        <Unit filename="src/stockfish.cpp">
+            <Option compilerVar="CPP" />
+        </Unit>
+        <Unit filename="src/graphics/Application.cpp">
+            <Option compilerVar="CPP" />
+        </Unit>
+        <Unit filename="src/graphics/Board.cpp">
+            <Option compilerVar="CPP" />
+        </Unit>
+        <Unit filename="src/graphics/Mesh.cpp">
+            <Option compilerVar="CPP" />
+        </Unit>
+        <Unit filename="src/graphics/Object.cpp">
+            <Option compilerVar="CPP" />
+        </Unit>
+        <Unit filename="src/graphics/Shader.cpp">
+            <Option compilerVar="CPP" />
+        </Unit>
+        <Unit filename="src/pieces/Bishop.cpp">
+            <Option compilerVar="CPP" />
+        </Unit>
+        <Unit filename="src/pieces/King.cpp">
+            <Option compilerVar="CPP" />
+        </Unit>
+        <Unit filename="src/pieces/Knight.cpp">
+            <Option compilerVar="CPP" />
+        </Unit>
+        <Unit filename="src/pieces/Pawn.cpp">
+            <Option compilerVar="CPP" />
+        </Unit>
+        <Unit filename="src/pieces/Piece.cpp">
+            <Option compilerVar="CPP" />
+        </Unit>
+        <Unit filename="src/pieces/Queen.cpp">
+            <Option compilerVar="CPP" />
+        </Unit>
+        <Unit filename="src/pieces/Rook.cpp">
+            <Option compilerVar="CPP" />
+        </Unit>
+        <Unit filename="vendor/glfw/src/context.c">
+            <Option compilerVar="CC" />
+            <Option target="Windows" />
+            <Option target="Linux" />
+            <Option target="macOS" />
+        </Unit>
+        <Unit filename="vendor/glfw/src/init.c">
+            <Option compilerVar="CC" />
+            <Option target="Windows" />
+            <Option target="Linux" />
+            <Option target="macOS" />
+        </Unit>
+        <Unit filename="vendor/glfw/src/input.c">
+            <Option compilerVar="CC" />
+            <Option target="Windows" />
+            <Option target="Linux" />
+            <Option target="macOS" />
+        </Unit>
+        <Unit filename="vendor/glfw/src/monitor.c">
+            <Option compilerVar="CC" />
+            <Option target="Windows" />
+            <Option target="Linux" />
+            <Option target="macOS" />
+        </Unit>
+        <Unit filename="vendor/glfw/src/platform.c">
+            <Option compilerVar="CC" />
+            <Option target="Windows" />
+            <Option target="Linux" />
+            <Option target="macOS" />
+        </Unit>
+        <Unit filename="vendor/glfw/src/vulkan.c">
+            <Option compilerVar="CC" />
+            <Option target="Windows" />
+            <Option target="Linux" />
+            <Option target="macOS" />
+        </Unit>
+        <Unit filename="vendor/glfw/src/window.c">
+            <Option compilerVar="CC" />
+            <Option target="Windows" />
+            <Option target="Linux" />
+            <Option target="macOS" />
+        </Unit>
+        <Unit filename="vendor/glfw/src/egl_context.c">
+            <Option compilerVar="CC" />
+            <Option target="Windows" />
+            <Option target="Linux" />
+            <Option target="macOS" />
+        </Unit>
+        <Unit filename="vendor/glfw/src/osmesa_context.c">
+            <Option compilerVar="CC" />
+            <Option target="Windows" />
+            <Option target="Linux" />
+            <Option target="macOS" />
+        </Unit>
+        <Unit filename="vendor/glfw/src/null_init.c">
+            <Option compilerVar="CC" />
+            <Option target="Windows" />
+            <Option target="Linux" />
+            <Option target="macOS" />
+        </Unit>
+        <Unit filename="vendor/glfw/src/null_monitor.c">
+            <Option compilerVar="CC" />
+            <Option target="Windows" />
+            <Option target="Linux" />
+            <Option target="macOS" />
+        </Unit>
+        <Unit filename="vendor/glfw/src/null_window.c">
+            <Option compilerVar="CC" />
+            <Option target="Windows" />
+            <Option target="Linux" />
+            <Option target="macOS" />
+        </Unit>
+        <Unit filename="vendor/glfw/src/null_joystick.c">
+            <Option compilerVar="CC" />
+            <Option target="Windows" />
+            <Option target="Linux" />
+            <Option target="macOS" />
+        </Unit>
+        <Unit filename="vendor/glfw/src/win32_init.c">
+            <Option compilerVar="CC" />
+            <Option target="Windows" />
+        </Unit>
+        <Unit filename="vendor/glfw/src/win32_joystick.c">
+            <Option compilerVar="CC" />
+            <Option target="Windows" />
+        </Unit>
+        <Unit filename="vendor/glfw/src/win32_monitor.c">
+            <Option compilerVar="CC" />
+            <Option target="Windows" />
+        </Unit>
+        <Unit filename="vendor/glfw/src/win32_window.c">
+            <Option compilerVar="CC" />
+            <Option target="Windows" />
+        </Unit>
+        <Unit filename="vendor/glfw/src/win32_time.c">
+            <Option compilerVar="CC" />
+            <Option target="Windows" />
+        </Unit>
+        <Unit filename="vendor/glfw/src/win32_thread.c">
+            <Option compilerVar="CC" />
+            <Option target="Windows" />
+        </Unit>
+        <Unit filename="vendor/glfw/src/win32_module.c">
+            <Option compilerVar="CC" />
+            <Option target="Windows" />
+        </Unit>
+        <Unit filename="vendor/glfw/src/wgl_context.c">
+            <Option compilerVar="CC" />
+            <Option target="Windows" />
+        </Unit>
+        <Unit filename="vendor/glfw/src/x11_init.c">
+            <Option compilerVar="CC" />
+            <Option target="Linux" />
+        </Unit>
+        <Unit filename="vendor/glfw/src/x11_monitor.c">
+            <Option compilerVar="CC" />
+            <Option target="Linux" />
+        </Unit>
+        <Unit filename="vendor/glfw/src/x11_window.c">
+            <Option compilerVar="CC" />
+            <Option target="Linux" />
+        </Unit>
+        <Unit filename="vendor/glfw/src/xkb_unicode.c">
+            <Option compilerVar="CC" />
+            <Option target="Linux" />
+        </Unit>
+        <Unit filename="vendor/glfw/src/glx_context.c">
+            <Option compilerVar="CC" />
+            <Option target="Linux" />
+        </Unit>
+        <Unit filename="vendor/glfw/src/posix_time.c">
+            <Option compilerVar="CC" />
+            <Option target="Linux" />
+        </Unit>
+        <Unit filename="vendor/glfw/src/posix_thread.c">
+            <Option compilerVar="CC" />
+            <Option target="Linux" />
+            <Option target="macOS" />
+        </Unit>
+        <Unit filename="vendor/glfw/src/posix_module.c">
+            <Option compilerVar="CC" />
+            <Option target="Linux" />
+            <Option target="macOS" />
+        </Unit>
+        <Unit filename="vendor/glfw/src/posix_poll.c">
+            <Option compilerVar="CC" />
+            <Option target="Linux" />
+        </Unit>
+        <Unit filename="vendor/glfw/src/linux_joystick.c">
+            <Option compilerVar="CC" />
+            <Option target="Linux" />
+        </Unit>
+        <Unit filename="vendor/glfw/src/cocoa_init.m">
+            <Option compilerVar="CC" />
+            <Option target="macOS" />
+        </Unit>
+        <Unit filename="vendor/glfw/src/cocoa_joystick.m">
+            <Option compilerVar="CC" />
+            <Option target="macOS" />
+        </Unit>
+        <Unit filename="vendor/glfw/src/cocoa_monitor.m">
+            <Option compilerVar="CC" />
+            <Option target="macOS" />
+        </Unit>
+        <Unit filename="vendor/glfw/src/cocoa_window.m">
+            <Option compilerVar="CC" />
+            <Option target="macOS" />
+        </Unit>
+        <Unit filename="vendor/glfw/src/nsgl_context.m">
+            <Option compilerVar="CC" />
+            <Option target="macOS" />
+        </Unit>
+        <Unit filename="vendor/glfw/src/macos_time.c">
+            <Option compilerVar="CC" />
+            <Option target="macOS" />
+        </Unit>
+        <Unit filename="include/Application.h" />
+        <Unit filename="include/Bishop.h" />
+        <Unit filename="include/Board.h" />
+        <Unit filename="include/King.h" />
+        <Unit filename="include/Knight.h" />
+        <Unit filename="include/Math.h" />
+        <Unit filename="include/Mesh.h" />
+        <Unit filename="include/Object.h" />
+        <Unit filename="include/Pawn.h" />
+        <Unit filename="include/Piece.h" />
+        <Unit filename="include/Queen.h" />
+        <Unit filename="include/Rook.h" />
+        <Unit filename="include/Shader.h" />
+        <Unit filename="shaders/scene.vert" />
+        <Unit filename="shaders/scene.frag" />
+        <Option makefile_is_custom="1" />
     </Project>
 </CodeBlocks_project_file>

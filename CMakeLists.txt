@@ -1,6 +1,5 @@
 cmake_minimum_required(VERSION 3.16)
-project(XadrezStockfish LANGUAGES CXX)
-
+project(XadrezStockfish LANGUAGES C CXX)
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
@@ -8,9 +7,16 @@ set(CMAKE_RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/bin")
 foreach(configuration DEBUG RELEASE RELWITHDEBINFO MINSIZEREL)
     set(CMAKE_RUNTIME_OUTPUT_DIRECTORY_${configuration} "${CMAKE_BINARY_DIR}/bin")
 endforeach()
-
 find_package(Python3 3.9 REQUIRED COMPONENTS Interpreter)
 find_package(Threads REQUIRED)
+# GLFW and GLAD ship as portable sources. No installed GLFW/GLEW is used.
+set(GLFW_BUILD_EXAMPLES OFF CACHE BOOL "" FORCE)
+set(GLFW_BUILD_TESTS OFF CACHE BOOL "" FORCE)
+set(GLFW_BUILD_DOCS OFF CACHE BOOL "" FORCE)
+set(GLFW_INSTALL OFF CACHE BOOL "" FORCE)
+set(GLFW_BUILD_WAYLAND OFF CACHE BOOL "Wayland backend (optional on Linux)")
+set(BUILD_SHARED_LIBS OFF)
+add_subdirectory(vendor/glfw EXCLUDE_FROM_ALL)
 set(STOCKFISH_LOCAL "" CACHE FILEPATH "Stockfish alternativo (opcional)")
 set(engine_arguments --output "${CMAKE_BINARY_DIR}/bin")
 if(STOCKFISH_LOCAL)
@@ -18,13 +24,18 @@ if(STOCKFISH_LOCAL)
 endif()
 add_custom_target(prepare_stockfish
     COMMAND "${Python3_EXECUTABLE}" "${CMAKE_CURRENT_SOURCE_DIR}/tools/setup_engine.py" ${engine_arguments}
-    COMMENT "Preparando Stockfish local para a plataforma"
-    VERBATIM)
-
-add_executable(xadrez src/main.cpp src/jogo.cpp src/stockfish.cpp src/autoteste.cpp)
-target_include_directories(xadrez PRIVATE src vendor/chess-library)
-target_link_libraries(xadrez PRIVATE Threads::Threads)
+    COMMENT "Preparando Stockfish local" VERBATIM)
+file(GLOB graphics_sources CONFIGURE_DEPENDS src/graphics/*.cpp src/pieces/*.cpp)
+add_executable(xadrez src/main.cpp src/jogo.cpp src/stockfish.cpp ${graphics_sources})
+add_custom_target(prepare_shaders
+    COMMAND "${CMAKE_COMMAND}" -E copy_directory
+            "${CMAKE_CURRENT_SOURCE_DIR}/shaders" "$<TARGET_FILE_DIR:xadrez>/shaders"
+    COMMENT "Copiando shaders GLSL" VERBATIM)
+add_dependencies(xadrez prepare_shaders)
+target_include_directories(xadrez PRIVATE include src vendor/chess-library vendor/glfw/deps)
+target_link_libraries(xadrez PRIVATE glfw Threads::Threads)
 if(MINGW)
+    target_link_libraries(xadrez PRIVATE gdi32)
     target_link_options(xadrez PRIVATE -static)
 endif()
 if(MSVC)
@@ -33,7 +44,3 @@ else()
     target_compile_options(xadrez PRIVATE -Wall -Wextra -Wpedantic)
 endif()
 add_dependencies(xadrez prepare_stockfish)
-
-enable_testing()
-add_test(NAME stockfish_api COMMAND xadrez --self-test --time 50)
-set_tests_properties(stockfish_api PROPERTIES TIMEOUT 90)

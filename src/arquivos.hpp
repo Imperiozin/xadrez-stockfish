@@ -12,7 +12,7 @@
 #endif
 #endif
 
-#if defined(XADREZ_USE_BUNDLED_FILESYSTEM) || \
+#if defined(XADREZ_USE_BUNDLED_FILESYSTEM) ||                                                      \
     (defined(__GNUC__) && !defined(__clang__) && __GNUC__ < 9)
 #include "../vendor/ghc-filesystem/filesystem.hpp"
 namespace arquivos = ghc::filesystem;

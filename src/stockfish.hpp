@@ -8,24 +8,26 @@
 // Ponte UCI: este arquivo não conhece tabuleiro, terminal ou OpenGL.
 // A instância deve ser acessada por apenas uma thread de cada vez.
 class Stockfish {
-public:
-    explicit Stockfish(const arquivos::path& executable,
-                       int milliseconds = 300, int skill = 5, bool trace = false);
+  public:
+    explicit Stockfish(const arquivos::path &executable, int milliseconds = 300, int skill = 0,
+                       bool trace = false);
     ~Stockfish();
-    Stockfish(const Stockfish&) = delete;
-    Stockfish& operator=(const Stockfish&) = delete;
+    Stockfish(const Stockfish &) = delete;
+    Stockfish &operator=(const Stockfish &) = delete;
 
-    std::string responder(const std::vector<std::string>& history);
+    // Quando solicitado, coleta ate tres candidatos via MultiPV para o modo iniciante.
+    std::string responder(const std::vector<std::string> &history,
+                          std::vector<std::string> *melhores = nullptr);
     void novaPartida();
 
     // Alterações valem para a próxima busca e são mantidas em novaPartida().
     // Valores inválidos lançam std::invalid_argument sem alterar a configuração.
-    void definirDificuldade(int nivel);  // 0 (menor força) a 20 (força máxima).
+    void definirDificuldade(int nivel); // 0 (menor força) a 20 (força máxima).
     int dificuldade() const;
-    void definirTempoPensamento(int tempoMs);  // 1 a 60000 milissegundos por lance.
+    void definirTempoPensamento(int tempoMs); // 1 a 60000 milissegundos por lance.
     int tempoPensamento() const;
 
-private:
+  private:
     struct Impl;
     std::unique_ptr<Impl> impl_;
 };
