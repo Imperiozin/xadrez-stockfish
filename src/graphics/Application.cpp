@@ -31,6 +31,7 @@ Application::~Application() {
         pending.wait();
     }
 
+    for (auto &piece : promotionPieces) piece.reset();
     board.reset();
     primitives.reset();
     shader.reset();
@@ -42,7 +43,7 @@ Application::~Application() {
 }
 
 Vec3 Application::eye() const {
-    return {distance * std::cos(pitch) * std::sin(yaw), distance * std::sin(pitch),
+    return cameraTarget + Vec3{distance * std::cos(pitch) * std::sin(yaw), distance * std::sin(pitch),
             distance * std::cos(pitch) * std::cos(yaw)};
 }
 
@@ -52,13 +53,15 @@ void Application::refresh() {
     board->sync(cachedFen);
     board->selected = -1;
     board->destinations.clear();
+    board->captures.clear();
+    board->castling.clear();
 }
 
 void Application::title() {
     std::ostringstream text;
     text << "XADREZ 3D | " << status << " | Nivel " << game.dificuldade() << " / "
          << game.tempoPensamento()
-         << " ms | Clique: mover | Dir: camera | Scroll: zoom | N: novo | Setas: nivel | PgUp/Dn: "
+         << " ms | Clique: mover | Meio: camera | Dir: cancelar | Scroll: zoom | N: novo | Setas: camera | Shift+Setas: altura | +/-: nivel | PgUp/Dn: "
             "tempo | Home: camera | Esc: sair";
     glfwSetWindowTitle(window, text.str().c_str());
 }
@@ -70,7 +73,7 @@ int Application::pick(double x, double y) const {
         return -1;
     }
     auto e = eye();
-    auto forward = normalized(Vec3{} - e);
+    auto forward = normalized(cameraTarget - e);
     auto right = normalized(cross(forward, {0, 1, 0}));
     auto up = cross(right, forward);
     float nx = float(2 * x / w - 1);
@@ -94,8 +97,7 @@ void Application::click(int square) {
         return;
     }
     if (square < 0) {
-        board->selected = -1;
-        board->destinations.clear();
+        cancelSelection();
         return;
     }
 
@@ -105,7 +107,7 @@ void Application::click(int square) {
             if (move.compare(0, 4, prefix) == 0) {
                 if (move.size() == 5) {
                     promotionPrefix = prefix;
-                    status = "Promocao: Q rainha / R torre / B bispo / C cavalo";
+                    status = "Promocao: clique em rainha, torre, bispo ou cavalo";
                     title();
                     return;
                 }
@@ -117,8 +119,25 @@ void Application::click(int square) {
 
     board->selected = board->isWhite(square) ? square : -1;
     board->destinations.clear();
+    board->captures.clear();
+    board->castling.clear();
 
     if (board->selected >= 0) {
+        chess::Board position(cachedFen);
+        chess::Movelist moves;
+        chess::movegen::legalmoves(moves, position);
+        for (auto move : moves) {
+            if (move.from().index() != square) continue;
+            int destination = move.to().index();
+            if (move.typeOf() == chess::Move::CASTLING) {
+                destination = square / 8 * 8 + (destination > square ? 6 : 2);
+                board->castling.push_back(destination);
+            } else if (position.isCapture(move)) {
+                // En passant destaca a base do peao que sera capturado.
+                board->captures.push_back(move.typeOf() == chess::Move::ENPASSANT
+                    ? destination - 8 : destination);
+            }
+        }
         auto name = squareName(square);
         for (auto &move : legal) {
             if (move.compare(0, 2, name) == 0) {
@@ -147,6 +166,8 @@ void Application::submit(const std::string &move) {
     board->sync(preview.getFen());
     board->selected = -1;
     board->destinations.clear();
+    board->captures.clear();
+    board->castling.clear();
     promotionPrefix.clear();
     status = "Stockfish pensando...";
     title();
@@ -191,9 +212,7 @@ void Application::reset() {
 void Application::key(int k) {
     if (k == GLFW_KEY_ESCAPE) {
         if (!promotionPrefix.empty()) {
-            promotionPrefix.clear();
-            status = "Promocao cancelada";
-            title();
+            cancelSelection();
         } else {
             glfwSetWindowShouldClose(window, GLFW_TRUE);
         }
@@ -203,6 +222,7 @@ void Application::key(int k) {
         yaw = 0;
         pitch = .87f;
         distance = 17;
+        cameraTarget = {};
         return;
     }
     if (pending.valid()) {
@@ -210,22 +230,14 @@ void Application::key(int k) {
     }
     try {
         if (!promotionPrefix.empty()) {
-            char c = k == GLFW_KEY_Q   ? 'q'
-                     : k == GLFW_KEY_R ? 'r'
-                     : k == GLFW_KEY_B ? 'b'
-                     : k == GLFW_KEY_C ? 'n'
-                                       : 0;
-            if (c) {
-                submit(promotionPrefix + c);
-            }
             return;
         }
         if (k == GLFW_KEY_N) {
             reset();
         }
-        if (k == GLFW_KEY_UP || k == GLFW_KEY_DOWN) {
+        if (k == GLFW_KEY_EQUAL || k == GLFW_KEY_MINUS || k == GLFW_KEY_KP_ADD || k == GLFW_KEY_KP_SUBTRACT) {
             game.definirDificuldade(
-                std::clamp(game.dificuldade() + (k == GLFW_KEY_UP ? 1 : -1), -20, 20));
+                std::clamp(game.dificuldade() + ((k == GLFW_KEY_EQUAL || k == GLFW_KEY_KP_ADD) ? 1 : -1), -20, 20));
         }
         if (k == GLFW_KEY_PAGE_UP || k == GLFW_KEY_PAGE_DOWN) {
             game.definirTempoPensamento(std::clamp(
@@ -246,11 +258,12 @@ void Application::render() {
     glViewport(0, 0, width, height);
     glClearColor(.035f, .055f, .075f, 1);
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-    shader->use(perspective(float(width) / height) * lookAt(eye()), eye());
+    shader->use(perspective(float(width) / height) * lookAt(eye(), cameraTarget), eye());
     auto identity = Mat4::identity();
     primitives->draw(*shader, Primitive::Cube, identity, {0, -.85f, 0}, {200, .10f, 200},
                      {.055f, .085f, .10f});
     board->draw(*shader, identity);
+    if (!promotionPrefix.empty()) drawPromotion();
 }
 
 int Application::run() {
@@ -279,6 +292,8 @@ int Application::run() {
     shader = std::make_unique<Shader>();
     primitives = std::make_unique<Primitives>();
     board = std::make_unique<Board>(*primitives);
+    const char symbols[] = "QRBN";
+    for (int i = 0; i < 4; ++i) promotionPieces[i] = Piece::create(symbols[i], *primitives);
     refresh();
     title();
 
@@ -289,9 +304,13 @@ int Application::run() {
         double x, y;
         glfwGetCursorPos(w, &x, &y);
         if (button == GLFW_MOUSE_BUTTON_LEFT && action == GLFW_PRESS) {
-            a.click(a.pick(x, y));
+            if (!a.promotionPrefix.empty()) {
+                int choice = a.promotionChoice(x, y);
+                if (choice >= 0) a.submit(a.promotionPrefix + "qrbn"[choice]);
+            } else a.click(a.pick(x, y));
         }
-        if (button == GLFW_MOUSE_BUTTON_RIGHT) {
+        if (button == GLFW_MOUSE_BUTTON_RIGHT && action == GLFW_PRESS) a.cancelSelection();
+        if (button == GLFW_MOUSE_BUTTON_MIDDLE) {
             a.dragging = action == GLFW_PRESS;
             a.mouseX = x;
             a.mouseY = y;
@@ -304,6 +323,8 @@ int Application::run() {
             a.yaw -= float(x - a.mouseX) * .006f;
             a.pitch = std::clamp(a.pitch + float(y - a.mouseY) * .006f, .25f, 1.48f);
         }
+        a.constrainCamera();
+        a.board->hovered = a.promotionPrefix.empty() ? a.pick(x, y) : -1;
         a.mouseX = x;
         a.mouseY = y;
     });
@@ -311,6 +332,7 @@ int Application::run() {
     glfwSetScrollCallback(window, [](GLFWwindow *w, double, double y) {
         auto &a = *static_cast<Application *>(glfwGetWindowUserPointer(w));
         a.distance = std::clamp(a.distance - float(y), 10.f, 28.f);
+        a.constrainCamera();
     });
 
     glfwSetKeyCallback(window, [](GLFWwindow *w, int key, int, int action, int) {
@@ -321,10 +343,85 @@ int Application::run() {
 
     // Loop principal: atualiza o jogo, desenha a cena e processa eventos.
     while (!glfwWindowShouldClose(window)) {
+        double now = glfwGetTime();
+        moveCamera(float(std::min(now - lastFrame, .05)));
+        lastFrame = now;
         update();
         render();
         glfwSwapBuffers(window);
         glfwPollEvents();
     }
     return 0;
+}
+
+void Application::cancelSelection() {
+    promotionPrefix.clear();
+    board->selected = -1;
+    board->destinations.clear();
+    board->captures.clear();
+    board->castling.clear();
+    if (!pending.valid() && !finished) status = "Selecione uma peca branca";
+    title();
+}
+
+void Application::constrainCamera() {
+    Vec3 e = eye();
+    Vec3 bounded{std::clamp(e.x, -24.f, 24.f), std::clamp(e.y, 2.5f, 26.f),
+                 std::clamp(e.z, -24.f, 24.f)};
+    cameraTarget = cameraTarget + bounded - e;
+}
+
+void Application::moveCamera(float dt) {
+    auto pressed = [this](int k) { return glfwGetKey(window, k) == GLFW_PRESS; };
+    float horizontal = float(pressed(GLFW_KEY_RIGHT)) - float(pressed(GLFW_KEY_LEFT));
+    float vertical = float(pressed(GLFW_KEY_UP)) - float(pressed(GLFW_KEY_DOWN));
+    Vec3 right{std::cos(yaw), 0, -std::sin(yaw)};
+    Vec3 forward{-std::sin(yaw), 0, -std::cos(yaw)};
+    Vec3 movement = right * horizontal;
+    if (pressed(GLFW_KEY_LEFT_SHIFT) || pressed(GLFW_KEY_RIGHT_SHIFT)) movement.y = vertical;
+    else movement = movement + forward * vertical;
+    if (dot(movement, movement) > 0) {
+        cameraTarget = cameraTarget + normalized(movement) * (dt * 6.f);
+        constrainCamera();
+    }
+    board->hovered = promotionPrefix.empty() ? pick(mouseX, mouseY) : -1;
+}
+
+int Application::promotionChoice(double x, double y) const {
+    int w, h;
+    glfwGetWindowSize(window, &w, &h);
+    if (w <= 0 || h <= 0) return -1;
+    float nx = float(x / w), ny = float(y / h);
+    if (ny < .32f || ny >= .68f) return -1;
+    for (int i = 0; i < 4; ++i) {
+        float left = .06f + i * .225f;
+        if (nx >= left && nx < left + .205f) return i;
+    }
+    return -1;
+}
+
+void Application::drawPromotion() {
+    // Coordenadas normalizadas compartilhadas com o teste de clique; funciona em HiDPI.
+    int hovered = promotionChoice(mouseX, mouseY);
+    glEnable(GL_SCISSOR_TEST);
+    const Vec3 previewEye{0, 2.3f, 4.6f};
+    const float rotation = float(std::fmod(glfwGetTime() * .8, 6.2831853));
+    for (int i = 0; i < 4; ++i) {
+        int x = int((.06f + i * .225f) * width);
+        int y = int(.32f * height);
+        int w = int(.205f * width), h = int(.36f * height);
+        if (w <= 8 || h <= 8) continue;
+        glScissor(x, y, w, h);
+        glClearColor(i == hovered ? .95f : .30f, i == hovered ? .68f : .77f, .53f, 1);
+        glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+        glScissor(x + 4, y + 4, w - 8, h - 8);
+        glClearColor(.06f, .09f, .12f, 1);
+        glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+        glViewport(x, y, w, h);
+        shader->use(perspective(float(w) / h) * lookAt(previewEye, {0, .6f, 0}), previewEye);
+        promotionPieces[i]->angle = rotation;
+        promotionPieces[i]->draw(*shader, Mat4::identity());
+    }
+    glDisable(GL_SCISSOR_TEST);
+    glViewport(0, 0, width, height);
 }

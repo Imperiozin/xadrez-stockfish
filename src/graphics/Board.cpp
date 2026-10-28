@@ -49,9 +49,35 @@ void Board::draw(Shader &s, const Mat4 &parent) {
         if (i == selected) {
             c = {.83f, .56f, .16f};
         }
+        if (i == hovered && i != selected) {
+            c = c * .75f + Vec3{.25f, .28f, .22f};
+        }
         primitives.draw(s, Primitive::Cube, m, {p.x, 0, p.z}, {.99f, .06f, .99f}, c);
+        const Vec3 green{.30f, .77f, .53f};
+        if (std::find(captures.begin(), captures.end(), i) != captures.end() || i == selected) {
+            Vec3 color = i == selected ? Vec3{1.f, .68f, .15f} : Vec3{1.f, .08f, .06f};
+            // Pequenas esferas formam um contorno continuo ao redor da base.
+            for (int segment = 0; segment < 64; ++segment) {
+                float a = segment * 6.2831853f / 64;
+                primitives.draw(s, Primitive::Sphere, m,
+                    {p.x + .38f * std::cos(a), .09f, p.z + .38f * std::sin(a)},
+                    {.025f, .025f, .025f}, color);
+            }
+        }
+        if (std::find(castling.begin(), castling.end(), i) != castling.end()) {
+            for (int side = 0; side < 4; ++side) {
+                for (int dash = 0; dash < 5; ++dash) {
+                    float offset = -.36f + dash * .18f;
+                    bool horizontal = side < 2;
+                    primitives.draw(s, Primitive::Cube, m,
+                        {p.x + (horizontal ? offset : (side == 2 ? -.44f : .44f)), .045f,
+                         p.z + (horizontal ? (side == 0 ? -.44f : .44f) : offset)},
+                        horizontal ? Vec3{.10f, .02f, .025f} : Vec3{.025f, .02f, .10f}, green);
+                }
+            }
+        }
         if (std::find(destinations.begin(), destinations.end(), i) != destinations.end()) {
-            primitives.draw(s, Primitive::Cylinder, m, {p.x, .034f, p.z}, {.115f, .012f, .115f},
+            primitives.draw(s, Primitive::Sphere, m, {p.x, .10f, p.z}, {.095f, .095f, .095f},
                             {.30f, .77f, .53f});
         }
     }

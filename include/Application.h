@@ -19,7 +19,15 @@ class Application {
     double mouseX = 0, mouseY = 0;
     float yaw = 0, pitch = .87f, distance = 17;
     int width = 1280, height = 900;
+    Vec3 cameraTarget{};
+    double lastFrame = 0;
+    std::array<std::unique_ptr<Piece>, 4> promotionPieces;
     Vec3 eye() const;
+    void constrainCamera();
+    void moveCamera(float dt);
+    void cancelSelection();
+    int promotionChoice(double x, double y) const;
+    void drawPromotion();
     void refresh();
     void title();
     void click(int square);

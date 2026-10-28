@@ -77,8 +77,8 @@ inline Mat4 perspective(float aspect) {
     return m;
 }
 
-inline Mat4 lookAt(Vec3 eye) {
-    Vec3 f = normalized(Vec3{0, 0, 0} - eye), s = normalized(cross(f, {0, 1, 0})), u = cross(s, f);
+inline Mat4 lookAt(Vec3 eye, Vec3 target = {}) {
+    Vec3 f = normalized(target - eye), s = normalized(cross(f, {0, 1, 0})), u = cross(s, f);
     auto m = Mat4::identity();
     m.v[0] = s.x;
     m.v[4] = s.y;

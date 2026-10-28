@@ -10,7 +10,8 @@ class Board : public Object {
     std::array<char, 64> symbols{};
 
   public:
-    int selected = -1;
+    int selected = -1, hovered = -1;
+    std::vector<int> captures, castling;
     std::vector<int> destinations;
 
     explicit Board(Primitives &p) : primitives(p) {}
