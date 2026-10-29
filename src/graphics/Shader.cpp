@@ -37,11 +37,11 @@ GLuint compile(GLenum type, const arquivos::path &path) {
 }
 } // namespace
 
-Shader::Shader() {
+Shader::Shader(const char *vertexFile, const char *fragmentFile) {
     const auto shaderDirectory = pastaDoExecutavel() / "shaders";
-    GLuint vs = compile(GL_VERTEX_SHADER, shaderDirectory / "scene.vert"), fs = 0;
+    GLuint vs = compile(GL_VERTEX_SHADER, shaderDirectory / vertexFile), fs = 0;
     try {
-        fs = compile(GL_FRAGMENT_SHADER, shaderDirectory / "scene.frag");
+        fs = compile(GL_FRAGMENT_SHADER, shaderDirectory / fragmentFile);
     } catch (...) {
         glDeleteShader(vs);
         throw;
@@ -68,6 +68,8 @@ Shader::~Shader() {
 
 void Shader::use(const Mat4 &vp, Vec3 eye) {
     glUseProgram(id);
+    glUniform3f(glGetUniformLocation(id, "lightPosition"), -4.f, 10.f, 5.f);
+    glUniform1i(glGetUniformLocation(id, "shadowsEnabled"), GL_FALSE);
     glUniformMatrix4fv(glGetUniformLocation(id, "viewProjection"), 1, GL_FALSE, vp.v);
     glUniform3f(glGetUniformLocation(id, "eye"), eye.x, eye.y, eye.z);
 }
@@ -75,4 +77,15 @@ void Shader::use(const Mat4 &vp, Vec3 eye) {
 void Shader::object(const Mat4 &m, Vec3 c) {
     glUniformMatrix4fv(glGetUniformLocation(id, "model"), 1, GL_FALSE, m.v);
     glUniform3f(glGetUniformLocation(id, "color"), c.x, c.y, c.z);
+}
+
+void Shader::shadows(const Mat4 &lightViewProjection, Vec3 lightPosition, GLuint depthMap) {
+    glUniformMatrix4fv(glGetUniformLocation(id, "lightViewProjection"), 1, GL_FALSE,
+                       lightViewProjection.v);
+    glUniform3f(glGetUniformLocation(id, "lightPosition"), lightPosition.x, lightPosition.y,
+                lightPosition.z);
+    glUniform1i(glGetUniformLocation(id, "shadowsEnabled"), GL_TRUE);
+    glUniform1i(glGetUniformLocation(id, "shadowMap"), 0);
+    glActiveTexture(GL_TEXTURE0);
+    glBindTexture(GL_TEXTURE_2D, depthMap);
 }

@@ -35,6 +35,9 @@ Application::~Application() {
     board.reset();
     primitives.reset();
     shader.reset();
+    depthShader.reset();
+    if (shadowMap) glDeleteTextures(1, &shadowMap);
+    if (shadowFramebuffer) glDeleteFramebuffers(1, &shadowFramebuffer);
     if (window) {
         glfwDestroyWindow(window);
     }
@@ -255,14 +258,32 @@ void Application::render() {
     if (width < 1 || height < 1) {
         return;
     }
+    // Projeção de 90 graus: mantém as sombras alinhadas à luz pontual da cena.
+    const Vec3 lightPosition{-4.f, 10.f, 5.f};
+    Mat4 lightProjection;
+    lightProjection.v[0] = lightProjection.v[5] = 1.f;
+    lightProjection.v[10] = -31.f / 29.f;
+    lightProjection.v[11] = -1.f;
+    lightProjection.v[14] = -60.f / 29.f;
+    const Mat4 lightViewProjection = lightProjection * lookAt(lightPosition);
+
+    // Primeira passagem: somente profundidade, vista pela luz.
+    glActiveTexture(GL_TEXTURE0);
+    glBindTexture(GL_TEXTURE_2D, 0);
+    glViewport(0, 0, shadowResolution, shadowResolution);
+    glBindFramebuffer(GL_FRAMEBUFFER, shadowFramebuffer);
+    glClear(GL_DEPTH_BUFFER_BIT);
+    depthShader->use(lightViewProjection, lightPosition);
+    drawScene(*depthShader);
+    glBindFramebuffer(GL_FRAMEBUFFER, 0);
+
+    // Segunda passagem: iluminação com consulta ao mapa de sombras.
     glViewport(0, 0, width, height);
     glClearColor(.035f, .055f, .075f, 1);
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
     shader->use(perspective(float(width) / height) * lookAt(eye(), cameraTarget), eye());
-    auto identity = Mat4::identity();
-    primitives->draw(*shader, Primitive::Cube, identity, {0, -.85f, 0}, {200, .10f, 200},
-                     {.055f, .085f, .10f});
-    board->draw(*shader, identity);
+    shader->shadows(lightViewProjection, lightPosition, shadowMap);
+    drawScene(*shader);
     if (!promotionPrefix.empty()) drawPromotion();
 }
 
@@ -290,6 +311,7 @@ int Application::run() {
 
     // Recursos graficos e estado inicial da cena.
     shader = std::make_unique<Shader>();
+    initializeShadows();
     primitives = std::make_unique<Primitives>();
     board = std::make_unique<Board>(*primitives);
     const char symbols[] = "QRBN";
@@ -424,4 +446,34 @@ void Application::drawPromotion() {
     }
     glDisable(GL_SCISSOR_TEST);
     glViewport(0, 0, width, height);
+}
+
+void Application::initializeShadows() {
+    depthShader = std::make_unique<Shader>("shadow.vert", "shadow.frag");
+    glGenTextures(1, &shadowMap);
+    glBindTexture(GL_TEXTURE_2D, shadowMap);
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_DEPTH_COMPONENT24, shadowResolution, shadowResolution,
+                 0, GL_DEPTH_COMPONENT, GL_FLOAT, nullptr);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_BORDER);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_BORDER);
+    const float border[] = {1.f, 1.f, 1.f, 1.f};
+    glTexParameterfv(GL_TEXTURE_2D, GL_TEXTURE_BORDER_COLOR, border);
+    glGenFramebuffers(1, &shadowFramebuffer);
+    glBindFramebuffer(GL_FRAMEBUFFER, shadowFramebuffer);
+    glFramebufferTexture2D(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_TEXTURE_2D, shadowMap, 0);
+    glDrawBuffer(GL_NONE);
+    glReadBuffer(GL_NONE);
+    const bool complete = glCheckFramebufferStatus(GL_FRAMEBUFFER) == GL_FRAMEBUFFER_COMPLETE;
+    glBindFramebuffer(GL_FRAMEBUFFER, 0);
+    glBindTexture(GL_TEXTURE_2D, 0);
+    require(complete, "Falha ao criar framebuffer de sombras");
+}
+
+void Application::drawScene(Shader &sceneShader) {
+    const auto identity = Mat4::identity();
+    primitives->draw(sceneShader, Primitive::Cube, identity, {0, -.85f, 0},
+                     {200, .10f, 200}, {.055f, .085f, .10f});
+    board->draw(sceneShader, identity);
 }

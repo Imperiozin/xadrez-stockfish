@@ -5,14 +5,17 @@ layout(location = 1) in vec3 normal;
 
 uniform mat4 model;
 uniform mat4 viewProjection;
+uniform mat4 lightViewProjection;
 
 out vec3 worldPosition;
 out vec3 worldNormal;
+out vec4 lightSpacePosition;
 
 void main() {
     vec4 transformedPosition = model * vec4(position, 1.0);
     mat3 normalMatrix = mat3(transpose(inverse(model)));
 
+    lightSpacePosition = lightViewProjection * transformedPosition;
     worldPosition = transformedPosition.xyz;
     worldNormal = normalMatrix * normal;
     gl_Position = viewProjection * transformedPosition;

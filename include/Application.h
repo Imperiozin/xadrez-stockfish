@@ -10,6 +10,11 @@ class Application {
     Jogo &game;
     GLFWwindow *window = nullptr;
     std::unique_ptr<Shader> shader;
+    std::unique_ptr<Shader> depthShader;
+    GLuint shadowFramebuffer = 0, shadowMap = 0;
+    static constexpr int shadowResolution = 4096;
+    void initializeShadows();
+    void drawScene(Shader &sceneShader);
     std::unique_ptr<Primitives> primitives;
     std::unique_ptr<Board> board;
     std::future<std::unique_ptr<RespostaMovimento>> pending;

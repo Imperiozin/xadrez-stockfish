@@ -191,3 +191,14 @@ Código próprio: [MIT](LICENSE). As dependências preservam seus avisos:
 Stockfish (fontes e `Copying.txt` em cada pacote). A demonstração gráfica
 Stockfish (fontes e `Copying.txt` em cada pacote). A demonstração gráfica
 anterior foi arquivada localmente em `.cache/legacy-opengl`, fora do build.
+
+## Sombras
+
+A cena utiliza shadow mapping em duas passagens, seguindo a referência do
+[LearnOpenGL](https://learnopengl.com/Advanced-Lighting/Shadows/Shadow-Mapping).
+O mapa de profundidade de 2048 × 2048 é atualizado a cada quadro e inclui
+peças, tabuleiro e chão. A luz em `Application::render` usa uma projeção
+perspectiva alinhada à iluminação pontual existente. O shader aplica PCF 3 × 3
+para suavizar as bordas e bias dependente da inclinação para reduzir artefatos.
+A sombra afeta as componentes difusa e especular, preservando a luz ambiente.
+As prévias de promoção são iluminadas separadamente, sem consultar esse mapa.
