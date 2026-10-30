@@ -32,6 +32,11 @@ add_custom_target(prepare_shaders
             "${CMAKE_CURRENT_SOURCE_DIR}/shaders" "$<TARGET_FILE_DIR:xadrez>/shaders"
     COMMENT "Copiando shaders GLSL" VERBATIM)
 add_dependencies(xadrez prepare_shaders)
+add_custom_target(prepare_assets
+    COMMAND "${CMAKE_COMMAND}" -E copy_directory
+            "${CMAKE_CURRENT_SOURCE_DIR}/assets" "$<TARGET_FILE_DIR:xadrez>/assets"
+    COMMENT "Copiando assets dos cenarios" VERBATIM)
+add_dependencies(xadrez prepare_assets)
 target_include_directories(xadrez PRIVATE include src vendor/chess-library vendor/glfw/deps)
 target_link_libraries(xadrez PRIVATE glfw Threads::Threads)
 if(MINGW)

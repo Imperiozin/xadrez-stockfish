@@ -1,5 +1,6 @@
 #pragma once
 #include "Math.h"
+#include "Scenario.h"
 #include <glad/gl.h>
 
 class Shader {
@@ -11,6 +12,7 @@ class Shader {
     Shader(const Shader &) = delete;
     Shader &operator=(const Shader &) = delete;
     void use(const Mat4 &viewProjection, Vec3 eye);
+    void lighting(const Scenario &scenario);
     void shadows(const Mat4 &lightViewProjection, Vec3 lightPosition, GLuint depthMap);
-    void object(const Mat4 &model, Vec3 color);
+    void object(const Mat4 &model, Vec3 color, bool wood = false);
 };

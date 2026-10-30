@@ -36,6 +36,7 @@ def main():
         output=Path(args.output).resolve() if args.output else ROOT/"build"/system.lower()/"bin"
         output.mkdir(parents=True,exist_ok=True)
         shutil.copytree(ROOT/"shaders",output/"shaders",dirs_exist_ok=True)
+        shutil.copytree(ROOT/"assets",output/"assets",dirs_exist_ok=True)
         prepare(output,args.engine)
         objects=output.parent/"obj"/"glfw"
         objects.mkdir(parents=True,exist_ok=True)

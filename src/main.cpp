@@ -28,15 +28,16 @@ int main(int argc, char **argv) {
 #endif
         int time = 300, skill = 0;
         bool trace = false;
+        std::string scenarioFile = "assets/scenarios/sunset.cfg";
         for (int i = 1; i < argc; ++i) {
             std::string arg = argv[i];
             if (arg == "--trace") {
                 trace = true;
             } else if (arg == "--help") {
                 std::cout << "Xadrez 3D: --engine caminho --time 1..60000 --skill -20..20 "
-                             "--trace\n";
+                             "--trace --scenario caminho.cfg\n";
                 return 0;
-            } else if ((arg == "--engine" || arg == "--time" || arg == "--skill") &&
+            } else if ((arg == "--engine" || arg == "--time" || arg == "--skill" || arg == "--scenario") &&
                        i + 1 < argc) {
                 std::string value = argv[++i];
                 if (arg == "--engine") {
@@ -45,13 +46,15 @@ int main(int argc, char **argv) {
                     time = integer(value);
                 } else if (arg == "--skill") {
                     skill = integer(value);
+                } else if (arg == "--scenario") {
+                    scenarioFile = value;
                 }
             } else {
                 throw std::invalid_argument("Argumento desconhecido ou sem valor: " + arg);
             }
         }
         Jogo game(engine, time, skill, trace);
-        Application app(game);
+        Application app(game, scenarioFile);
         return app.run();
     } catch (const std::exception &e) {
         std::cerr << "ERRO: " << e.what() << '\n';

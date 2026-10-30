@@ -147,7 +147,6 @@ O executável encontra o motor ao lado dele em `engines`, independentemente
 da pasta de trabalho. Para distribuir, mantenha essa pasta junto do executável.
 
 ## Organização orientada a objetos
-## Organização orientada a objetos
 
 A estrutura segue as responsabilidades do projeto de referência `GLFW_Cubo_OO`:
 A estrutura segue as responsabilidades do projeto de referência `GLFW_Cubo_OO`:

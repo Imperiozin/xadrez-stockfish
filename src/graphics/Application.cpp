@@ -33,9 +33,11 @@ Application::~Application() {
 
     for (auto &piece : promotionPieces) piece.reset();
     board.reset();
+    table.reset();
     primitives.reset();
     shader.reset();
     depthShader.reset();
+    skybox.reset();
     if (shadowMap) glDeleteTextures(1, &shadowMap);
     if (shadowFramebuffer) glDeleteFramebuffers(1, &shadowFramebuffer);
     if (window) {
@@ -223,8 +225,8 @@ void Application::key(int k) {
     }
     if (k == GLFW_KEY_HOME) {
         yaw = 0;
-        pitch = .87f;
-        distance = 17;
+        pitch = .65f;
+        distance = 32;
         cameraTarget = {};
         return;
     }
@@ -258,14 +260,8 @@ void Application::render() {
     if (width < 1 || height < 1) {
         return;
     }
-    // Projeção de 90 graus: mantém as sombras alinhadas à luz pontual da cena.
-    const Vec3 lightPosition{-4.f, 10.f, 5.f};
-    Mat4 lightProjection;
-    lightProjection.v[0] = lightProjection.v[5] = 1.f;
-    lightProjection.v[10] = -31.f / 29.f;
-    lightProjection.v[11] = -1.f;
-    lightProjection.v[14] = -60.f / 29.f;
-    const Mat4 lightViewProjection = lightProjection * lookAt(lightPosition);
+    const Vec3 lightPosition = scenario.lightPosition;
+    const Mat4 lightViewProjection = scenario.lightViewProjection();
 
     // Primeira passagem: somente profundidade, vista pela luz.
     glActiveTexture(GL_TEXTURE0);
@@ -282,8 +278,10 @@ void Application::render() {
     glClearColor(.035f, .055f, .075f, 1);
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
     shader->use(perspective(float(width) / height) * lookAt(eye(), cameraTarget), eye());
+    shader->lighting(scenario);
     shader->shadows(lightViewProjection, lightPosition, shadowMap);
     drawScene(*shader);
+    skybox->draw(eye(), cameraTarget, float(width) / height);
     if (!promotionPrefix.empty()) drawPromotion();
 }
 
@@ -310,10 +308,13 @@ int Application::run() {
     glEnable(GL_MULTISAMPLE);
 
     // Recursos graficos e estado inicial da cena.
+    scenario = Scenario::load(scenarioFile);
     shader = std::make_unique<Shader>();
     initializeShadows();
+    skybox = std::make_unique<Skybox>(scenario.skybox);
     primitives = std::make_unique<Primitives>();
     board = std::make_unique<Board>(*primitives);
+    table = std::make_unique<Table>();
     const char symbols[] = "QRBN";
     for (int i = 0; i < 4; ++i) promotionPieces[i] = Piece::create(symbols[i], *primitives);
     refresh();
@@ -343,7 +344,7 @@ int Application::run() {
         auto &a = *static_cast<Application *>(glfwGetWindowUserPointer(w));
         if (a.dragging) {
             a.yaw -= float(x - a.mouseX) * .006f;
-            a.pitch = std::clamp(a.pitch + float(y - a.mouseY) * .006f, .25f, 1.48f);
+            a.pitch = std::clamp(a.pitch + float(y - a.mouseY) * .006f, -.20f, 1.53f);
         }
         a.constrainCamera();
         a.board->hovered = a.promotionPrefix.empty() ? a.pick(x, y) : -1;
@@ -353,7 +354,7 @@ int Application::run() {
 
     glfwSetScrollCallback(window, [](GLFWwindow *w, double, double y) {
         auto &a = *static_cast<Application *>(glfwGetWindowUserPointer(w));
-        a.distance = std::clamp(a.distance - float(y), 10.f, 28.f);
+        a.distance = std::clamp(a.distance - float(y), 4.f, 45.f);
         a.constrainCamera();
     });
 
@@ -388,8 +389,8 @@ void Application::cancelSelection() {
 
 void Application::constrainCamera() {
     Vec3 e = eye();
-    Vec3 bounded{std::clamp(e.x, -24.f, 24.f), std::clamp(e.y, 2.5f, 26.f),
-                 std::clamp(e.z, -24.f, 24.f)};
+    Vec3 bounded{std::clamp(e.x, -45.f, 45.f), std::clamp(e.y, -7.f, 40.f),
+                 std::clamp(e.z, -45.f, 45.f)};
     cameraTarget = cameraTarget + bounded - e;
 }
 
@@ -441,6 +442,7 @@ void Application::drawPromotion() {
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
         glViewport(x, y, w, h);
         shader->use(perspective(float(w) / h) * lookAt(previewEye, {0, .6f, 0}), previewEye);
+        shader->lighting(scenario);
         promotionPieces[i]->angle = rotation;
         promotionPieces[i]->draw(*shader, Mat4::identity());
     }
@@ -454,8 +456,10 @@ void Application::initializeShadows() {
     glBindTexture(GL_TEXTURE_2D, shadowMap);
     glTexImage2D(GL_TEXTURE_2D, 0, GL_DEPTH_COMPONENT24, shadowResolution, shadowResolution,
                  0, GL_DEPTH_COMPONENT, GL_FLOAT, nullptr);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_COMPARE_MODE, GL_COMPARE_REF_TO_TEXTURE);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_COMPARE_FUNC, GL_LEQUAL);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_BORDER);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_BORDER);
     const float border[] = {1.f, 1.f, 1.f, 1.f};
@@ -473,7 +477,6 @@ void Application::initializeShadows() {
 
 void Application::drawScene(Shader &sceneShader) {
     const auto identity = Mat4::identity();
-    primitives->draw(sceneShader, Primitive::Cube, identity, {0, -.85f, 0},
-                     {200, .10f, 200}, {.055f, .085f, .10f});
+    table->draw(sceneShader, identity);
     board->draw(sceneShader, identity);
 }

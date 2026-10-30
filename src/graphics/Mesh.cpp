@@ -49,8 +49,9 @@ std::vector<Vertex> Mesh::cube() {
 
 std::vector<Vertex> Mesh::cylinder(float top) {
     std::vector<Vertex> v;
-    for (int i = 0; i < 32; ++i) {
-        float a = 2 * pi * i / 32, b = 2 * pi * (i + 1) / 32;
+    constexpr int segments = 64;
+    for (int i = 0; i < segments; ++i) {
+        float a = 2 * pi * i / segments, b = 2 * pi * (i + 1) / segments;
         Vec3 p{std::cos(a), 0, std::sin(a)}, q{std::cos(b), 0, std::sin(b)},
             r{p.x * top, 1, p.z * top}, s{q.x * top, 1, q.z * top};
         auto n = normalized(Vec3{p.x, 1 - top, p.z}), m = normalized(Vec3{q.x, 1 - top, q.z});
@@ -69,10 +70,11 @@ std::vector<Vertex> Mesh::sphere() {
     auto point = [](float a, float b) {
         return Vec3{std::sin(a) * std::cos(b), std::cos(a), std::sin(a) * std::sin(b)};
     };
-    for (int j = 0; j < 16; ++j) {
-        for (int i = 0; i < 24; ++i) {
-            float a = pi * j / 16, b = pi * (j + 1) / 16, c = 2 * pi * i / 24,
-                  d = 2 * pi * (i + 1) / 24;
+    constexpr int rings = 32, segments = 64;
+    for (int j = 0; j < rings; ++j) {
+        for (int i = 0; i < segments; ++i) {
+            float a = pi * j / rings, b = pi * (j + 1) / rings, c = 2 * pi * i / segments,
+                  d = 2 * pi * (i + 1) / segments;
             auto p = point(a, c), q = point(b, c), r = point(b, d), s = point(a, d);
             tri(v, p, q, r, p, q, r);
             tri(v, p, r, s, p, r, s);

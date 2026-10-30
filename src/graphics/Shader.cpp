@@ -68,13 +68,36 @@ Shader::~Shader() {
 
 void Shader::use(const Mat4 &vp, Vec3 eye) {
     glUseProgram(id);
-    glUniform3f(glGetUniformLocation(id, "lightPosition"), -4.f, 10.f, 5.f);
     glUniform1i(glGetUniformLocation(id, "shadowsEnabled"), GL_FALSE);
     glUniformMatrix4fv(glGetUniformLocation(id, "viewProjection"), 1, GL_FALSE, vp.v);
     glUniform3f(glGetUniformLocation(id, "eye"), eye.x, eye.y, eye.z);
 }
 
-void Shader::object(const Mat4 &m, Vec3 c) {
+void Shader::lighting(const Scenario &scene) {
+    auto vector = [&](const char *name, Vec3 v) {
+        glUniform3f(glGetUniformLocation(id, name), v.x, v.y, v.z);
+    };
+    auto scalar = [&](const char *name, float value) {
+        glUniform1f(glGetUniformLocation(id, name), value);
+    };
+    vector("lightPosition", scene.lightPosition);
+    vector("lightColor", scene.lightColor);
+    vector("ambientColor", scene.ambientColor);
+    vector("fogColor", scene.fogColor);
+    scalar("lightIntensity", scene.lightIntensity);
+    scalar("ambientStrength", scene.ambientStrength);
+    scalar("diffuseStrength", scene.diffuseStrength);
+    scalar("specularStrength", scene.specularStrength);
+    scalar("woodSpecularStrength", scene.woodSpecularStrength);
+    scalar("shininess", scene.shininess);
+    scalar("fogDensity", scene.fogDensity);
+    scalar("shadowBias", scene.shadowBias);
+    scalar("shadowMinBias", scene.shadowMinBias);
+    scalar("shadowNormalOffset", scene.shadowNormalOffset);
+}
+
+void Shader::object(const Mat4 &m, Vec3 c, bool wood) {
+    glUniform1i(glGetUniformLocation(id, "woodMaterial"), wood);
     glUniformMatrix4fv(glGetUniformLocation(id, "model"), 1, GL_FALSE, m.v);
     glUniform3f(glGetUniformLocation(id, "color"), c.x, c.y, c.z);
 }
