@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Compila a unica aplicacao Xadrez 3D com GLFW local, sem CMake."""
+"""Compila a única aplicação Xadrez 3D com GLFW e Dear ImGui locais, sem CMake."""
 import argparse
 import os
 from pathlib import Path
@@ -26,13 +26,13 @@ def main():
     args=parser.parse_args()
     try:
         system=platform.system()
-        if system not in BACKENDS: raise RuntimeError("Plataforma nao suportada: "+system)
+        if system not in BACKENDS: raise RuntimeError("Plataforma não suportada: "+system)
         compiler=shutil.which(args.compiler)
         if compiler is None and os.name=="nt": compiler=shutil.which("C:/MinGW/bin/g++.exe")
-        if compiler is None: raise RuntimeError("Compilador C++ nao encontrado: "+args.compiler)
+        if compiler is None: raise RuntimeError("Compilador C++ não encontrado: "+args.compiler)
         os.environ["PATH"]=str(Path(compiler).parent)+os.pathsep+os.environ.get("PATH","")
         cc=shutil.which(args.cc or ("gcc" if system=="Windows" else "cc"))
-        if cc is None: raise RuntimeError("Compilador C nao encontrado; informe --cc")
+        if cc is None: raise RuntimeError("Compilador C não encontrado; informe --cc")
         output=Path(args.output).resolve() if args.output else ROOT/"build"/system.lower()/"bin"
         output.mkdir(parents=True,exist_ok=True)
         shutil.copytree(ROOT/"shaders",output/"shaders",dirs_exist_ok=True)
@@ -58,14 +58,17 @@ def main():
         executable=output/("xadrez.exe" if os.name=="nt" else "xadrez")
         sources=[ROOT/"src"/name for name in ("main.cpp","jogo.cpp","stockfish.cpp")]
         sources+=sorted((ROOT/"src/graphics").glob("*.cpp"))+sorted((ROOT/"src/pieces").glob("*.cpp"))
+        sources += [ROOT/"vendor/imgui"/name for name in (
+            "imgui.cpp", "imgui_draw.cpp", "imgui_tables.cpp", "imgui_widgets.cpp",
+            "backends/imgui_impl_glfw.cpp", "backends/imgui_impl_opengl3.cpp")]
         command=[compiler,"-std=c++17","-O2","-Wall","-Wextra","-Wpedantic","-pthread"]
-        command += ["-I"+str(ROOT/p) for p in ("include","src","vendor/chess-library","vendor/glfw/include","vendor/glfw/deps")]
+        command += ["-I"+str(ROOT/p) for p in ("include","src","vendor/chess-library","vendor/glfw/include","vendor/glfw/deps","vendor/imgui","vendor/imgui/backends")]
         command += [str(p) for p in sources]+object_paths+libraries
         if system=="Windows":command.append("-static")
         command += ["-o",str(executable)]
         print("Compilando Xadrez 3D...",flush=True)
         subprocess.run(command,check=True)
-        print("Build concluido:",executable,flush=True)
+        print("Compilação concluída:",executable,flush=True)
         if args.run:return subprocess.call([str(executable)])
         return 0
     except (OSError,RuntimeError,subprocess.CalledProcessError) as exc:

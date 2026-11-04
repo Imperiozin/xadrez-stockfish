@@ -25,7 +25,10 @@ class Application {
     std::unique_ptr<Table> table;
     std::future<std::unique_ptr<RespostaMovimento>> pending;
     std::vector<std::string> legal;
-    std::string cachedFen, status = "Sua vez: selecione uma peca branca", promotionPrefix;
+    std::string cachedFen, status = "Sua vez: selecione uma peça branca", promotionPrefix;
+    std::string resultTitle, resultReason;
+    int interfaceDifficulty = 0, interfaceThinkTime = 300;
+    float toolbarHeight = 0;
     bool finished = false, dragging = false;
     double mouseX = 0, mouseY = 0;
     float yaw = 0, pitch = .65f, distance = 32;
@@ -39,8 +42,12 @@ class Application {
     void cancelSelection();
     int promotionChoice(double x, double y) const;
     void drawPromotion();
+    void initializeInterface();
+    void drawInterface();
+    bool interfaceCapturesMouse(double x, double y) const;
+    void setDifficulty(int level);
+    void setThinkTime(int milliseconds);
     void refresh();
-    void title();
     void click(int square);
     void submit(const std::string &move);
     void update();

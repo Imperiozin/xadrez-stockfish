@@ -45,13 +45,31 @@ void atualizarResultado(const chess::Board &board, RespostaMovimento &response) 
     if (!response.fimPartida) {
         return;
     }
-    if (result.first == chess::GameResultReason::CHECKMATE) {
+    switch (result.first) {
+    case chess::GameResultReason::CHECKMATE:
         response.resultado = board.sideToMove() == chess::Color::WHITE
-                                 ? "Xeque-mate. Stockfish venceu."
-                                 : "Xeque-mate. Você venceu!";
-    } else {
-        response.resultado =
-            "Empate (afogamento, repetição, material insuficiente ou regra dos 50 lances).";
+                                 ? "Xeque-mate."
+                                 : "Xeque-mate.";
+        response.motivo = "Stockfish venceu.";
+        break;
+    case chess::GameResultReason::STALEMATE:
+        response.resultado = "Empate";
+        response.motivo = "Afogamento: não há lances legais e o rei não está em xeque.";
+        break;
+    case chess::GameResultReason::INSUFFICIENT_MATERIAL:
+        response.resultado = "Empate";
+        response.motivo = "Material insuficiente para dar xeque-mate.";
+        break;
+    case chess::GameResultReason::THREEFOLD_REPETITION:
+        response.resultado = "Empate";
+        response.motivo = "Tripla repetição: a mesma posição ocorreu três vezes.";
+        break;
+    case chess::GameResultReason::FIFTY_MOVE_RULE:
+        response.resultado = "Empate";
+        response.motivo = "Regra dos 50 lances: 50 lances de cada lado sem captura ou movimento de peão.";
+        break;
+    case chess::GameResultReason::NONE:
+        break;
     }
 }
 } // namespace

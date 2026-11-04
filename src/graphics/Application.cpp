@@ -2,10 +2,12 @@
 #include <glad/gl.h>
 #undef GLAD_GL_IMPLEMENTATION
 #include "Application.h"
+#include "imgui.h"
+#include "imgui_impl_glfw.h"
+#include "imgui_impl_opengl3.h"
 
 #include <chrono>
 #include <iostream>
-#include <sstream>
 #include <stdexcept>
 
 namespace {
@@ -29,6 +31,12 @@ void require(bool condition, const char *message) {
 Application::~Application() {
     if (pending.valid()) {
         pending.wait();
+    }
+
+    if (ImGui::GetCurrentContext()) {
+        if (ImGui::GetIO().BackendRendererUserData) ImGui_ImplOpenGL3_Shutdown();
+        if (ImGui::GetIO().BackendPlatformUserData) ImGui_ImplGlfw_Shutdown();
+        ImGui::DestroyContext();
     }
 
     for (auto &piece : promotionPieces) piece.reset();
@@ -60,15 +68,6 @@ void Application::refresh() {
     board->destinations.clear();
     board->captures.clear();
     board->castling.clear();
-}
-
-void Application::title() {
-    std::ostringstream text;
-    text << "XADREZ 3D | " << status << " | Nivel " << game.dificuldade() << " / "
-         << game.tempoPensamento()
-         << " ms | Clique: mover | Meio: camera | Dir: cancelar | Scroll: zoom | N: novo | Setas: camera | Shift+Setas: altura | +/-: nivel | PgUp/Dn: "
-            "tempo | Home: camera | Esc: sair";
-    glfwSetWindowTitle(window, text.str().c_str());
 }
 
 int Application::pick(double x, double y) const {
@@ -112,8 +111,7 @@ void Application::click(int square) {
             if (move.compare(0, 4, prefix) == 0) {
                 if (move.size() == 5) {
                     promotionPrefix = prefix;
-                    status = "Promocao: clique em rainha, torre, bispo ou cavalo";
-                    title();
+                    status = "Promoção: clique em rainha, torre, bispo ou cavalo";
                     return;
                 }
                 submit(move);
@@ -151,9 +149,8 @@ void Application::click(int square) {
         }
         status = "Selecionada " + name + ": clique em um destino verde";
     } else {
-        status = "Selecione uma peca branca";
+        status = "Selecione uma peça branca";
     }
-    title();
 }
 
 void Application::submit(const std::string &move) {
@@ -175,8 +172,6 @@ void Application::submit(const std::string &move) {
     board->castling.clear();
     promotionPrefix.clear();
     status = "Stockfish pensando...";
-    title();
-
     pending = std::async(std::launch::async, [this, move] {
         return game.fazerMovimento(move);
     });
@@ -191,15 +186,16 @@ void Application::update() {
         auto response = pending.get();
         if (response) {
             finished = response->fimPartida;
+            resultTitle = response->resultado;
+            resultReason = response->motivo;
             status = finished ? response->resultado : "Sua vez | Stockfish: " + response->movimento;
         } else {
-            status = "Lance invalido. Tente novamente.";
+            status = "Lance inválido. Tente novamente.";
         }
     } catch (const std::exception &e) {
         status = std::string("Erro do motor: ") + e.what();
     }
     refresh();
-    title();
 }
 
 void Application::reset() {
@@ -208,10 +204,11 @@ void Application::reset() {
     }
     game.reiniciar();
     finished = false;
+    resultTitle.clear();
+    resultReason.clear();
     promotionPrefix.clear();
     status = "Nova partida: brancas jogam";
     refresh();
-    title();
 }
 
 void Application::key(int k) {
@@ -237,21 +234,17 @@ void Application::key(int k) {
         if (!promotionPrefix.empty()) {
             return;
         }
-        if (k == GLFW_KEY_N) {
-            reset();
-        }
-        if (k == GLFW_KEY_EQUAL || k == GLFW_KEY_MINUS || k == GLFW_KEY_KP_ADD || k == GLFW_KEY_KP_SUBTRACT) {
-            game.definirDificuldade(
-                std::clamp(game.dificuldade() + ((k == GLFW_KEY_EQUAL || k == GLFW_KEY_KP_ADD) ? 1 : -1), -20, 20));
-        }
-        if (k == GLFW_KEY_PAGE_UP || k == GLFW_KEY_PAGE_DOWN) {
-            game.definirTempoPensamento(std::clamp(
-                game.tempoPensamento() + (k == GLFW_KEY_PAGE_UP ? 100 : -100), 1, 60000));
-        }
-        title();
+        // if (k == GLFW_KEY_N) {
+        //     reset();
+        // }
+        // if (k == GLFW_KEY_EQUAL || k == GLFW_KEY_MINUS || k == GLFW_KEY_KP_ADD || k == GLFW_KEY_KP_SUBTRACT) {
+        //     setDifficulty(interfaceDifficulty + ((k == GLFW_KEY_EQUAL || k == GLFW_KEY_KP_ADD) ? 1 : -1));
+        // }
+        // if (k == GLFW_KEY_PAGE_UP || k == GLFW_KEY_PAGE_DOWN) {
+        //     setThinkTime(interfaceThinkTime + (k == GLFW_KEY_PAGE_UP ? 100 : -100));
+        // }
     } catch (const std::exception &e) {
         status = e.what();
-        title();
     }
 }
 
@@ -283,6 +276,7 @@ void Application::render() {
     drawScene(*shader);
     skybox->draw(eye(), cameraTarget, float(width) / height);
     if (!promotionPrefix.empty()) drawPromotion();
+    ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
 }
 
 int Application::run() {
@@ -318,7 +312,6 @@ int Application::run() {
     const char symbols[] = "QRBN";
     for (int i = 0; i < 4; ++i) promotionPieces[i] = Piece::create(symbols[i], *primitives);
     refresh();
-    title();
 
     // Eventos de mouse, camera e teclado.
     glfwSetWindowUserPointer(window, this);
@@ -326,6 +319,8 @@ int Application::run() {
         auto &a = *static_cast<Application *>(glfwGetWindowUserPointer(w));
         double x, y;
         glfwGetCursorPos(w, &x, &y);
+        if (button == GLFW_MOUSE_BUTTON_MIDDLE && action == GLFW_RELEASE) a.dragging = false;
+        if (a.interfaceCapturesMouse(x, y)) return;
         if (button == GLFW_MOUSE_BUTTON_LEFT && action == GLFW_PRESS) {
             if (!a.promotionPrefix.empty()) {
                 int choice = a.promotionChoice(x, y);
@@ -342,37 +337,57 @@ int Application::run() {
 
     glfwSetCursorPosCallback(window, [](GLFWwindow *w, double x, double y) {
         auto &a = *static_cast<Application *>(glfwGetWindowUserPointer(w));
+        if (a.interfaceCapturesMouse(x, y)) {
+            a.dragging = false;
+            a.board->hovered = -1;
+            a.mouseX = x;
+            a.mouseY = y;
+            return;
+        }
         if (a.dragging) {
             a.yaw -= float(x - a.mouseX) * .006f;
             a.pitch = std::clamp(a.pitch + float(y - a.mouseY) * .006f, -.20f, 1.53f);
         }
         a.constrainCamera();
-        a.board->hovered = a.promotionPrefix.empty() ? a.pick(x, y) : -1;
+        a.board->hovered = !a.finished && a.promotionPrefix.empty() ? a.pick(x, y) : -1;
         a.mouseX = x;
         a.mouseY = y;
     });
 
     glfwSetScrollCallback(window, [](GLFWwindow *w, double, double y) {
         auto &a = *static_cast<Application *>(glfwGetWindowUserPointer(w));
+        double x, cursorY;
+        glfwGetCursorPos(w, &x, &cursorY);
+        if (a.interfaceCapturesMouse(x, cursorY)) return;
         a.distance = std::clamp(a.distance - float(y), 4.f, 45.f);
         a.constrainCamera();
     });
 
     glfwSetKeyCallback(window, [](GLFWwindow *w, int key, int, int action, int) {
+        if (ImGui::GetCurrentContext() && ImGui::GetIO().WantCaptureKeyboard) return;
         if (action == GLFW_PRESS || action == GLFW_REPEAT) {
             static_cast<Application *>(glfwGetWindowUserPointer(w))->key(key);
         }
     });
 
+    // O backend encadeia os callbacks acima e recebe todos os eventos da interface.
+    initializeInterface();
+
     // Loop principal: atualiza o jogo, desenha a cena e processa eventos.
     while (!glfwWindowShouldClose(window)) {
+        glfwPollEvents();
         double now = glfwGetTime();
-        moveCamera(float(std::min(now - lastFrame, .05)));
+        float dt = float(std::min(now - lastFrame, .05));
         lastFrame = now;
         update();
+        ImGui_ImplOpenGL3_NewFrame();
+        ImGui_ImplGlfw_NewFrame();
+        ImGui::NewFrame();
+        moveCamera(dt);
+        drawInterface();
+        ImGui::Render();
         render();
         glfwSwapBuffers(window);
-        glfwPollEvents();
     }
     return 0;
 }
@@ -383,8 +398,7 @@ void Application::cancelSelection() {
     board->destinations.clear();
     board->captures.clear();
     board->castling.clear();
-    if (!pending.valid() && !finished) status = "Selecione uma peca branca";
-    title();
+    if (!pending.valid() && !finished) status = "Selecione uma peça branca";
 }
 
 void Application::constrainCamera() {
@@ -395,7 +409,9 @@ void Application::constrainCamera() {
 }
 
 void Application::moveCamera(float dt) {
-    auto pressed = [this](int k) { return glfwGetKey(window, k) == GLFW_PRESS; };
+    auto pressed = [this](int k) {
+        return glfwGetKey(window, k) == GLFW_PRESS;
+    };
     float horizontal = float(pressed(GLFW_KEY_RIGHT)) - float(pressed(GLFW_KEY_LEFT));
     float vertical = float(pressed(GLFW_KEY_UP)) - float(pressed(GLFW_KEY_DOWN));
     Vec3 right{std::cos(yaw), 0, -std::sin(yaw)};
@@ -407,7 +423,9 @@ void Application::moveCamera(float dt) {
         cameraTarget = cameraTarget + normalized(movement) * (dt * 6.f);
         constrainCamera();
     }
-    board->hovered = promotionPrefix.empty() ? pick(mouseX, mouseY) : -1;
+    glfwGetCursorPos(window, &mouseX, &mouseY);
+    board->hovered = !finished && promotionPrefix.empty() && !interfaceCapturesMouse(mouseX, mouseY)
+        ? pick(mouseX, mouseY) : -1;
 }
 
 int Application::promotionChoice(double x, double y) const {

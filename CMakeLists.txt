@@ -17,6 +17,18 @@ set(GLFW_INSTALL OFF CACHE BOOL "" FORCE)
 set(GLFW_BUILD_WAYLAND OFF CACHE BOOL "Wayland backend (optional on Linux)")
 set(BUILD_SHARED_LIBS OFF)
 add_subdirectory(vendor/glfw EXCLUDE_FROM_ALL)
+add_library(imgui STATIC
+    vendor/imgui/imgui.cpp
+    vendor/imgui/imgui_draw.cpp
+    vendor/imgui/imgui_tables.cpp
+    vendor/imgui/imgui_widgets.cpp
+    vendor/imgui/backends/imgui_impl_glfw.cpp
+    vendor/imgui/backends/imgui_impl_opengl3.cpp)
+target_include_directories(imgui PUBLIC vendor/imgui vendor/imgui/backends)
+target_link_libraries(imgui PUBLIC glfw ${CMAKE_DL_LIBS})
+if(MSVC)
+    target_compile_options(imgui PRIVATE /utf-8)
+endif()
 set(STOCKFISH_LOCAL "" CACHE FILEPATH "Stockfish alternativo (opcional)")
 set(engine_arguments --output "${CMAKE_BINARY_DIR}/bin")
 if(STOCKFISH_LOCAL)
@@ -29,16 +41,16 @@ file(GLOB graphics_sources CONFIGURE_DEPENDS src/graphics/*.cpp src/pieces/*.cpp
 add_executable(xadrez src/main.cpp src/jogo.cpp src/stockfish.cpp ${graphics_sources})
 add_custom_target(prepare_shaders
     COMMAND "${CMAKE_COMMAND}" -E copy_directory
-            "${CMAKE_CURRENT_SOURCE_DIR}/shaders" "$<TARGET_FILE_DIR:xadrez>/shaders"
+            "${CMAKE_CURRENT_SOURCE_DIR}/shaders" "${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/shaders"
     COMMENT "Copiando shaders GLSL" VERBATIM)
 add_dependencies(xadrez prepare_shaders)
 add_custom_target(prepare_assets
     COMMAND "${CMAKE_COMMAND}" -E copy_directory
-            "${CMAKE_CURRENT_SOURCE_DIR}/assets" "$<TARGET_FILE_DIR:xadrez>/assets"
-    COMMENT "Copiando assets dos cenarios" VERBATIM)
+            "${CMAKE_CURRENT_SOURCE_DIR}/assets" "${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/assets"
+    COMMENT "Copiando assets dos cenários" VERBATIM)
 add_dependencies(xadrez prepare_assets)
 target_include_directories(xadrez PRIVATE include src vendor/chess-library vendor/glfw/deps)
-target_link_libraries(xadrez PRIVATE glfw Threads::Threads)
+target_link_libraries(xadrez PRIVATE imgui Threads::Threads)
 if(MINGW)
     target_link_libraries(xadrez PRIVATE gdi32)
     target_link_options(xadrez PRIVATE -static)

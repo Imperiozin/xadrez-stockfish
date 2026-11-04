@@ -51,6 +51,9 @@
         <Unit filename="src/graphics/Application.cpp">
             <Option compilerVar="CPP" />
         </Unit>
+        <Unit filename="src/graphics/ApplicationUI.cpp">
+            <Option compilerVar="CPP" />
+        </Unit>
         <Unit filename="src/graphics/Board.cpp">
             <Option compilerVar="CPP" />
         </Unit>
@@ -265,7 +268,7 @@
         <Unit filename="include/Board.h" />
         <Unit filename="include/King.h" />
         <Unit filename="include/Knight.h" />
-        <Unit filename="include/Math.h" />
+        <Unit filename="include/Math3D.h" />
         <Unit filename="include/Mesh.h" />
         <Unit filename="include/Object.h" />
         <Unit filename="include/Pawn.h" />

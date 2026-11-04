@@ -1,203 +1,205 @@
 # Xadrez 3D com Stockfish
 
-Uma única aplicação C++17/OpenGL: tabuleiro em um plano 3D, peças construídas
-com primitivas e partidas contra Stockfish 17.1. Você joga com as brancas.
-A aplicação abre a janela gráfica por padrão; a antiga interface de terminal
-foi substituída. A integração UCI foi preservada.
-Uma única aplicação C++17/OpenGL: tabuleiro em um plano 3D, peças construídas
-com primitivas e partidas contra Stockfish 17.1. Você joga com as brancas.
-A aplicação abre a janela gráfica por padrão; a antiga interface de terminal
-foi substituída. A integração UCI foi preservada.
+Jogo de xadrez em **C++17 e OpenGL 3.3**, com peças modeladas por primitivas geométricas, câmera livre e partidas contra o **Stockfish 17.1**. O jogador controla as peças brancas; o motor joga com as pretas por meio do protocolo UCI.
 
-## Compilar e jogar
+A cena reúne tabuleiro, mesa, céu panorâmico, iluminação, sombras e névoa. A interface usa Dear ImGui para iniciar partidas, escolher a dificuldade e acompanhar o estado do jogo.
 
-Requisitos comuns: Python 3.9+, compiladores C/C++17 e um driver OpenGL 3.3.
-GLFW e o carregador GLAD estão incluídos como fontes em `vendor/glfw` e são
-compilados localmente para cada sistema. Não é preciso instalar GLFW/GLEW,
-baixar dependências gráficas ou manter pastas externas ao projeto.
+## Recursos
+
+- Seleção pelo mouse, indicação de destinos legais e destaque de capturas e roques.
+- Regras validadas pela `chess-library`, incluindo roque, en passant e promoção para rainha, torre, bispo ou cavalo.
+- Detecção de xeque-mate e empates por afogamento, material insuficiente, tripla repetição e regra dos 50 lances.
+- Cinco opções de dificuldade na interface e níveis de −20 a 20 pela linha de comando.
+- Busca do Stockfish em segundo plano, mantendo a câmera e a renderização ativas.
+- Cenários configuráveis em arquivos de texto, sem recompilar o código C++.
+
+## Requisitos
+
+- Python **3.9 ou superior**.
+- Compiladores C e C++ com suporte a **C++17**.
+- Ambiente gráfico e driver com suporte a **OpenGL 3.3 Core**.
+- CMake **3.16 ou superior**, caso escolha essa forma de compilação.
+
+GLFW, GLAD, Dear ImGui, `chess-library` e `ghc-filesystem` estão incluídos em `vendor/`. Os pacotes do Stockfish para Windows x64, Linux x64, macOS Intel e macOS Apple Silicon também estão incluídos, com fontes e licenças. Com esses arquivos presentes, a preparação do motor dispensa download.
+
+Execute os comandos abaixo na raiz do projeto.
+
+## Compilar e executar
 
 ### Windows x64
 
-Instale MinGW/GCC e use:
+Instale Python e MinGW/GCC, disponibilizando `g++` e `gcc` no `PATH`:
 
 ```powershell
 python tools/build.py --run
-# Se o compilador estiver em outra pasta:
-python tools/build.py --run --compiler C:/MinGW/bin/g++.exe
 ```
 
-O script procura o compilador no PATH e, no Windows, também em
-`C:/MinGW/bin/g++.exe`. Esse é apenas um caminho alternativo para o compilador,
-não uma dependência do OpenGL. O executável fica em `build/windows/bin/xadrez.exe`.
-O script procura o compilador no PATH e, no Windows, também em
-`C:/MinGW/bin/g++.exe`. Esse é apenas um caminho alternativo para o compilador,
-não uma dependência do OpenGL. O executável fica em `build/windows/bin/xadrez.exe`.
+Para informar os compiladores explicitamente:
 
-### Linux
+```powershell
+python tools/build.py --run --compiler C:/MinGW/bin/g++.exe --cc C:/MinGW/bin/gcc.exe
+```
 
-Além de Python e GCC/Clang, instale os headers do sistema de janelas X11.
-Além de Python e GCC/Clang, instale os headers do sistema de janelas X11.
-No Debian/Ubuntu:
+O script também procura `g++` em `C:/MinGW/bin/g++.exe` quando não encontra o compilador solicitado. A saída padrão é `build/windows/bin/xadrez.exe`.
+
+### Linux x64
+
+No Debian ou Ubuntu, instale as ferramentas de compilação e os cabeçalhos do X11:
 
 ```sh
 sudo apt install build-essential python3 xorg-dev
 python3 tools/build.py --run
 ```
 
-O build Python usa X11 (também funciona em sessões Wayland com XWayland).
-O build Python usa X11 (também funciona em sessões Wayland com XWayland).
-O CMake permite habilitar Wayland nativo com `-DGLFW_BUILD_WAYLAND=ON`;
-nesse caso são necessários também `libwayland-dev`, `libxkbcommon-dev`,
-nesse caso são necessários também `libwayland-dev`, `libxkbcommon-dev`,
-`wayland-scanner` e `pkg-config`.
+A saída padrão é `build/linux/bin/xadrez`. O script usa X11; em sessões Wayland, precisa de XWayland.
 
 ### macOS Intel e Apple Silicon
 
-Instale as ferramentas de desenvolvimento da Apple (`xcode-select --install`)
-e Python 3.9+. GLFW usa os frameworks Cocoa, IOKit e QuartzCore do SDK:
+Instale Python e as ferramentas de desenvolvimento da Apple:
 
 ```sh
+xcode-select --install
 python3 tools/build.py --run --compiler clang++ --cc clang
 ```
 
-A janela usa contexto core 3.3 e forward compatibility no macOS.
-Não há dependência de DLLs Windows ou de bibliotecas gráficas Homebrew.
-Não há dependência de DLLs Windows ou de bibliotecas gráficas Homebrew.
+A saída padrão é `build/darwin/bin/xadrez`. A compilação usa os frameworks Cocoa, IOKit e QuartzCore do SDK da Apple.
 
-### CMake e Code::Blocks
+### Opções do script
 
-O mesmo alvo `xadrez` pode ser compilado com CMake 3.16+:
+| Opção | Função |
+| --- | --- |
+| `--run` | Abre o jogo após compilar. |
+| `--compiler CAMINHO` | Escolhe o compilador C++; também aceita a variável `CXX`. |
+| `--cc CAMINHO` | Escolhe o compilador C usado pelo GLFW; também aceita a variável `CC`. |
+| `--output PASTA` | Define a pasta de saída do executável e dos recursos. |
+| `--engine CAMINHO` | Copia e verifica um executável local do Stockfish. |
+
+Os scripts `compilar.bat` e `compilar.sh` encaminham os argumentos para `tools/build.py`. Por exemplo, `./compilar.bat --run` no PowerShell ou `sh compilar.sh --run` no Linux/macOS.
+
+### CMake
 
 ```sh
 cmake -S . -B build/cmake
 cmake --build build/cmake --config Release
 ```
 
-No Windows com MinGW, adicione seu `bin` ao PATH e configure com
-`-G "MinGW Makefiles"`. MSVC também é suportado pelo CMake.
-`-G "MinGW Makefiles"`. MSVC também é suportado pelo CMake.
-No Code::Blocks, abra somente `XadrezStockfish.cbp` e selecione o alvo da
-plataforma (`Windows`, `Linux` ou `macOS`). O projeto delega a compilação ao
-mesmo `tools/build.py`; configure `CXX`/`CC` no ambiente para escolher outro
-compilador. Não há um segundo projeto gráfico.
-compilador. Não há um segundo projeto gráfico.
+O executável e seus recursos ficam em `build/cmake/bin/`, inclusive nos geradores com múltiplas configurações. No Windows, execute `./build/cmake/bin/xadrez.exe`; no Linux/macOS, `./build/cmake/bin/xadrez`.
 
-## Controles
+Para MinGW no Windows, use `-G "MinGW Makefiles"` na configuração e mantenha suas ferramentas no `PATH`. Para MSVC, use um ambiente de desenvolvimento do Visual Studio.
 
-| Ação | Controle |
+Um motor alternativo pode ser definido na configuração com `-DSTOCKFISH_LOCAL="CAMINHO_DO_STOCKFISH"`. No Linux, o backend Wayland pode ser habilitado com `-DGLFW_BUILD_WAYLAND=ON`, desde que suas dependências de desenvolvimento estejam instaladas.
+
+### Code::Blocks
+
+Abra [XadrezStockfish.cbp](XadrezStockfish.cbp) e escolha o alvo `Windows`, `Linux` ou `macOS`. O projeto chama o mesmo script Python e grava os arquivos em `bin/Windows`, `bin/Linux` ou `bin/macOS`. Use `CXX` e `CC` no ambiente para selecionar os compiladores.
+
+## Como jogar
+
+1. Clique em uma peça branca para selecioná-la.
+2. Clique em um destino verde para realizar o lance.
+3. Aguarde a resposta do Stockfish e faça sua próxima jogada.
+
+A peça selecionada recebe um contorno dourado. Capturas legais são marcadas com um anel vermelho, inclusive no en passant; o destino do roque tem uma borda verde tracejada. Na promoção, clique em uma das quatro prévias de peças.
+
 | Ação | Controle |
 | --- | --- |
-| Selecionar peça / jogar | Clique esquerdo na peça branca, depois no destino verde |
-| Cancelar seleção / promoção | Botão direito (ou clique fora do tabuleiro para seleção) |
-| Girar / inclinar câmera | Arraste com o botão do meio (scroll pressionado) |
-| Deslocar câmera | Setas; Shift + cima/baixo para altura |
-| Limites da câmera | X/Z: -24 a 24; Y: 2,5 a 26 |
-| Aproximar / afastar | Roda do mouse |
-| Restaurar câmera | Home |
-| Restaurar câmera | Home |
-| Nova partida | N |
-| Aumentar / reduzir dificuldade | + / - (ou teclado numérico) |
-| Aumentar / reduzir tempo | Page Up / Page Down (100 ms por ajuste) |
-| Escolher promoção | Clique em um dos quatro quadros: rainha, torre, bispo, cavalo |
-| Sair / cancelar escolha de promoção | Esc |
+| Selecionar peça ou destino | Botão esquerdo do mouse. |
+| Cancelar seleção ou promoção | Botão direito do mouse. |
+| Cancelar seleção | Clique fora do tabuleiro. |
+| Girar e inclinar a câmera | Arraste com o botão do meio pressionado. |
+| Deslocar a câmera no plano horizontal | Setas do teclado. |
+| Subir ou descer a câmera | `Shift` + seta para cima ou para baixo. |
+| Aproximar ou afastar | Roda do mouse. |
+| Restaurar a câmera inicial | `Home`. |
+| Iniciar outra partida | Botão **Novo Jogo**. |
+| Alterar a dificuldade | Opções no painel superior. |
+| Cancelar promoção; fora dela, sair | `Esc`. |
 
-A seleção tem contorno dourado e realce sob o cursor. Capturas legais exibem
-um anel vermelho na base da peça adversária (incluindo en passant). O destino
-do roque tem uma borda tracejada verde. As quatro opções de promoção giram
-na mesma direção e velocidade e recebem destaque ao passar o mouse.
+Durante a busca do motor, os controles de nova partida e dificuldade ficam desabilitados. A câmera continua disponível. Reiniciar a partida preserva a dificuldade e o tempo de pensamento escolhidos.
 
-O título da janela informa o turno, pensamento do motor, resultado, dificuldade
-e tempo. Durante a busca, a câmera e a renderização continuam funcionando;
-comandos que alteram a partida aguardam a resposta da engine.
-Roque, en passant, capturas, promoções e término de partida são validados
-pela biblioteca de xadrez e refletidos na cena a partir da posição FEN.
-Roque, en passant, capturas, promoções e término de partida são validados
-pela biblioteca de xadrez e refletidos na cena a partir da posição FEN.
+## Dificuldade e opções de execução
 
-As configurações iniciais são dificuldade 0 e 300 ms por lance:
-As configurações iniciais são dificuldade 0 e 300 ms por lance:
+Por padrão, o jogo inicia no nível **0**, com **300 ms de pensamento por lance**.
 
-```sh
-./build/linux/bin/xadrez --skill 10 --time 500
+| Opção na interface | Nível |
+| --- | ---: |
+| Iniciante | −20 |
+| Fácil | −10 |
+| Intermediário | 0 |
+| Difícil | 10 |
+| Impossível | 20 |
+
+De 0 a 20, o valor corresponde ao `Skill Level` do Stockfish. Nos níveis negativos, o motor permanece no nível 0 e cada ponto negativo acrescenta 5% de chance de substituir sua resposta por outra jogada legal: 50% no −10 e 100% no −20, quando há alternativas. O sorteio procura excluir a resposta do motor e os candidatos obtidos por MultiPV, preservando uma alternativa quando há poucos lances. Esses níveis não representam uma classificação Elo nem garantem uma jogada ruim.
+
+O tempo de pensamento é configurado ao iniciar o executável:
+
+```powershell
+# Windows: nível mais fácil, com 500 ms por lance.
+./build/windows/bin/xadrez.exe --skill -20 --time 500
 ```
 
-De 0 a 20, a dificuldade usa o Skill Level nativo do Stockfish. De -1 a -20,
-o motor fica no Skill Level 0 e o jogo tem 5% de chance por nível negativo de
-o motor fica no Skill Level 0 e o jogo tem 5% de chance por nível negativo de
-substituir sua escolha por outra jogada legal sorteada (50% no -10 e 100% no
--20, quando existem alternativas). O MultiPV consulta três candidatos e o
-sorteio exclui essas opções e a resposta do motor, preservando pelo menos uma
-alternativa quando há poucos lances legais. Pode ocasionalmente escolher uma
-boa jogada; os níveis negativos não correspondem a uma escala Elo.
-Use `--skill -20` para iniciar no modo mais fácil.
--20, quando existem alternativas). O MultiPV consulta três candidatos e o
-sorteio exclui essas opções e a resposta do motor, preservando pelo menos uma
-alternativa quando há poucos lances legais. Pode ocasionalmente escolher uma
-boa jogada; os níveis negativos não correspondem a uma escala Elo.
-Use `--skill -20` para iniciar no modo mais fácil.
+```sh
+# Linux: nível 10, com 1 segundo por lance.
+./build/linux/bin/xadrez --skill 10 --time 1000
+```
 
-Os pacotes oficiais do Stockfish para Windows x64, Linux x64, macOS x64 e
-macOS ARM64 já estão em `vendor/stockfish`, com fontes e licenças. Para outra
-arquitetura, forneça um motor compatível: `python3 tools/build.py --engine CAMINHO`.
-O executável encontra o motor ao lado dele em `engines`, independentemente
-da pasta de trabalho. Para distribuir, mantenha essa pasta junto do executável.
-macOS ARM64 já estão em `vendor/stockfish`, com fontes e licenças. Para outra
-arquitetura, forneça um motor compatível: `python3 tools/build.py --engine CAMINHO`.
-O executável encontra o motor ao lado dele em `engines`, independentemente
-da pasta de trabalho. Para distribuir, mantenha essa pasta junto do executável.
-
-## Organização orientada a objetos
-
-A estrutura segue as responsabilidades do projeto de referência `GLFW_Cubo_OO`:
-A estrutura segue as responsabilidades do projeto de referência `GLFW_Cubo_OO`:
-
-| Classe / pasta | Responsabilidade |
+| Argumento do jogo | Valores e comportamento |
 | --- | --- |
-| `Application` | Janela GLFW, eventos, câmera, seleção e execução assíncrona da engine |
-| `Object` | Posição, rotação, escala e transformação herdada do objeto pai |
-| `Application` | Janela GLFW, eventos, câmera, seleção e execução assíncrona da engine |
-| `Object` | Posição, rotação, escala e transformação herdada do objeto pai |
-| `Mesh` | Geometria e recursos de GPU (VAO/VBO) |
-| `Shader` | Compilação GLSL, iluminação e matrizes |
-| `Shader` | Compilação GLSL, iluminação e matrizes |
-| `Primitives` | Malhas compartilhadas de cubo, cilindro, cone e esfera |
-| `Board` | Casas, seleção, destinos legais e objetos das peças |
-| `Piece` | Base comum, material, cor e criação das peças |
-| `Pawn`, `Rook`, `Knight`, `Bishop`, `Queen`, `King` | Composição e desenho próprios de cada tipo de peça |
-| `Jogo` / `Stockfish` | Regras e comunicação UCI, independentes da renderização |
-| `Board` | Casas, seleção, destinos legais e objetos das peças |
-| `Piece` | Base comum, material, cor e criação das peças |
-| `Pawn`, `Rook`, `Knight`, `Bishop`, `Queen`, `King` | Composição e desenho próprios de cada tipo de peça |
-| `Jogo` / `Stockfish` | Regras e comunicação UCI, independentes da renderização |
+| `--skill NIVEL` | Inteiro de −20 a 20. Padrão: `0`. |
+| `--time MS` | Inteiro de 1 a 60000, em milissegundos por lance. Padrão: `300`. |
+| `--engine CAMINHO` | Executável do Stockfish. Por padrão, usa `engines/stockfish` ou `engines/stockfish.exe` ao lado do jogo. |
+| `--scenario CAMINHO` | Arquivo de cenário. Padrão: `assets/scenarios/sunset.cfg`. |
+| `--trace` | Exibe a comunicação UCI no terminal para diagnóstico. |
+| `--help` | Mostra os argumentos disponíveis e encerra. |
 
-Headers ficam em `include/`; renderização em `src/graphics/`; cada tipo de
-peça tem seu header e implementação em `src/pieces/`. Para ajustar uma peça,
-altere as posições e escalas das primitivas no seu método `draw`.
-Cada peça do tabuleiro é um objeto, enquanto as malhas são compartilhadas.
-`Math.h` contém apenas os vetores e matrizes usados pela cena.
+Passe esses argumentos diretamente ao executável. A opção `--run` do script de compilação abre o jogo com os valores padrão.
 
-O worker consulta `Jogo` enquanto a interface desenha uma cópia da posição.
-Não há leituras simultâneas do estado do jogo durante a busca. A resposta
-atualiza a cena; em caso de erro, a posição original é restaurada.
+## Cenários e renderização
+
+O cenário padrão está em [assets/scenarios/sunset.cfg](assets/scenarios/sunset.cfg). Ele define a skybox, a posição e a cor da luz, os materiais, a névoa e os parâmetros das sombras.
+
+Para criar um cenário, copie esse arquivo, ajuste os valores e compile novamente para copiar os recursos. Depois, selecione a configuração ao executar:
+
+```powershell
+./build/windows/bin/xadrez.exe --scenario assets/scenarios/outro.cfg
+```
+
+Os caminhos de cenário são relativos à pasta do executável; caminhos absolutos também são aceitos. Para experimentar sem recompilar, edite a cópia na pasta de saída e reabra o jogo. A próxima compilação sobrescreve essa cópia.
+
+A descrição de cada parâmetro está em [assets/scenarios/README.md](assets/scenarios/README.md). Os shaders ficam em `shaders/`: a cena usa iluminação Blinn–Phong, madeira procedural e sombras em duas passagens, com mapa de profundidade de 4096 × 4096 e suavização PCF 3 × 3.
+
+## Organização do código
+
+| Local | Responsabilidade |
+| --- | --- |
+| `src/main.cpp` | Argumentos de execução e inicialização do jogo. |
+| `src/jogo.cpp` e `src/jogo.hpp` | Regras, lances legais, histórico e dificuldade. |
+| `src/stockfish.cpp` e `src/stockfish.hpp` | Processo do Stockfish e comunicação UCI. |
+| `src/graphics/Application.cpp` | Janela, eventos, câmera, seleção, renderização e busca assíncrona. |
+| `src/graphics/ApplicationUI.cpp` | Painel de controles e resultado da partida em Dear ImGui. |
+| `src/graphics/` | Tabuleiro, mesa, skybox, cenários, malhas, objetos e shaders. |
+| `src/pieces/` | Modelagem e desenho de cada tipo de peça. |
+| `include/` | Cabeçalhos da camada gráfica e operações matemáticas em `Math3D.h`. |
+| `shaders/` | Programas GLSL da cena, das sombras e da skybox. |
+| `assets/` | Configurações de cenário e imagens da skybox. |
+| `tools/` | Compilação e preparação dos pacotes do motor. |
+| `vendor/` | Dependências e pacotes do Stockfish. |
+
+As peças compartilham malhas de primitivas e definem sua forma por composição de objetos. A camada gráfica sincroniza o tabuleiro pela posição FEN. Enquanto o Stockfish calcula, a interface desenha uma cópia da posição e a tarefa em segundo plano acessa o jogo; se o motor falhar, o lance não é confirmado e a cena recupera a posição anterior.
+
+## Arquivos para execução
+
+Mantenha o executável junto das pastas `engines/`, `shaders/` e `assets/` geradas pela compilação. Os recursos padrão são localizados a partir da pasta do executável, permitindo abrir o jogo a partir de outro diretório.
+
+Para usar um Stockfish próprio, informe `--engine` ao script de compilação ou ao jogo. A preparação verifica a resposta UCI do motor. Se o pacote correspondente à plataforma não estiver em `vendor/stockfish/`, o preparador pode baixar a versão 17.1; para plataformas sem pacote automático, forneça um executável compatível.
 
 ## Licenças
-## Licenças
 
-Código próprio: [MIT](LICENSE). As dependências preservam seus avisos:
-Código próprio: [MIT](LICENSE). As dependências preservam seus avisos:
-`vendor/glfw/LICENSE.md`, headers GLAD em `vendor/glfw/deps/glad`,
-`vendor/chess-library/LICENSE`, `vendor/ghc-filesystem/LICENSE` e GPLv3 do
-Stockfish (fontes e `Copying.txt` em cada pacote). A demonstração gráfica
-Stockfish (fontes e `Copying.txt` em cada pacote). A demonstração gráfica
-anterior foi arquivada localmente em `.cache/legacy-opengl`, fora do build.
+O código próprio está sob a [licença MIT](LICENSE). As dependências mantêm suas licenças e avisos nos respectivos diretórios:
 
-## Sombras
-
-A cena utiliza shadow mapping em duas passagens, seguindo a referência do
-[LearnOpenGL](https://learnopengl.com/Advanced-Lighting/Shadows/Shadow-Mapping).
-O mapa de profundidade de 2048 × 2048 é atualizado a cada quadro e inclui
-peças, tabuleiro e chão. A luz em `Application::render` usa uma projeção
-perspectiva alinhada à iluminação pontual existente. O shader aplica PCF 3 × 3
-para suavizar as bordas e bias dependente da inclinação para reduzir artefatos.
-A sombra afeta as componentes difusa e especular, preservando a luz ambiente.
-As prévias de promoção são iluminadas separadamente, sem consultar esse mapa.
+- [GLFW](vendor/glfw/LICENSE.md).
+- GLAD: avisos nos arquivos em `vendor/glfw/deps/glad/`.
+- [Dear ImGui](vendor/imgui/LICENSE.txt).
+- [chess-library](vendor/chess-library/LICENSE).
+- [ghc-filesystem](vendor/ghc-filesystem/LICENSE).
+- Stockfish: GPLv3, com fontes e `Copying.txt` em cada pacote de `vendor/stockfish/`.
