@@ -8,6 +8,7 @@ import shutil
 import subprocess
 import sys
 from setup_engine import ROOT, prepare
+from build_assimp import build_assimp
 
 COMMON = "context init input monitor platform vulkan window egl_context osmesa_context null_init null_monitor null_window null_joystick".split()
 BACKENDS = {
@@ -38,6 +39,7 @@ def main():
         shutil.copytree(ROOT/"shaders",output/"shaders",dirs_exist_ok=True)
         shutil.copytree(ROOT/"assets",output/"assets",dirs_exist_ok=True)
         prepare(output,args.engine)
+        assimp_includes, assimp_library = build_assimp(compiler, cc, output.parent/"obj"/"assimp")
         objects=output.parent/"obj"/"glfw"
         objects.mkdir(parents=True,exist_ok=True)
         define,sources,libraries=BACKENDS[system]
@@ -63,7 +65,8 @@ def main():
             "backends/imgui_impl_glfw.cpp", "backends/imgui_impl_opengl3.cpp")]
         command=[compiler,"-std=c++17","-O2","-Wall","-Wextra","-Wpedantic","-pthread"]
         command += ["-I"+str(ROOT/p) for p in ("include","src","vendor/chess-library","vendor/glfw/include","vendor/glfw/deps","vendor/imgui","vendor/imgui/backends")]
-        command += [str(p) for p in sources]+object_paths+libraries
+        command += ["-I" + str(p) for p in assimp_includes]
+        command += [str(p) for p in sources]+object_paths+[str(assimp_library)]+libraries
         if system=="Windows":command.append("-static")
         command += ["-o",str(executable)]
         print("Compilando Xadrez 3D...",flush=True)

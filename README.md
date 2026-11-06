@@ -1,6 +1,6 @@
 # Xadrez 3D com Stockfish
 
-Jogo de xadrez em **C++17 e OpenGL 3.3**, com peças modeladas por primitivas geométricas, câmera livre e partidas contra o **Stockfish 17.1**. O jogador controla as peças brancas; o motor joga com as pretas por meio do protocolo UCI.
+Jogo de xadrez em **C++17 e OpenGL 3.3**, com peças importadas com Assimp, câmera livre e partidas contra o **Stockfish 17.1**. O jogador controla as peças brancas; o motor joga com as pretas por meio do protocolo UCI.
 
 A cena reúne tabuleiro, mesa, céu panorâmico, iluminação, sombras e névoa. A interface usa Dear ImGui para iniciar partidas, escolher a dificuldade e acompanhar o estado do jogo.
 
@@ -18,7 +18,8 @@ A cena reúne tabuleiro, mesa, céu panorâmico, iluminação, sombras e névoa.
 - Python **3.9 ou superior**.
 - Compiladores C e C++ com suporte a **C++17**.
 - Ambiente gráfico e driver com suporte a **OpenGL 3.3 Core**.
-- CMake **3.16 ou superior**, caso escolha essa forma de compilação.
+- Internet na primeira compilação para baixar as fontes do Assimp 5.4.3. O pacote fica em `.cache/` e pode ser reutilizado sem internet.
+- CMake **3.22 ou superior** é opcional, necessário apenas se escolher a alternativa CMake abaixo.
 
 GLFW, GLAD, Dear ImGui, `chess-library` e `ghc-filesystem` estão incluídos em `vendor/`. Os pacotes do Stockfish para Windows x64, Linux x64, macOS Intel e macOS Apple Silicon também estão incluídos, com fontes e licenças. Com esses arquivos presentes, a preparação do motor dispensa download.
 
@@ -74,9 +75,13 @@ A saída padrão é `build/darwin/bin/xadrez`. A compilação usa os frameworks 
 | `--output PASTA` | Define a pasta de saída do executável e dos recursos. |
 | `--engine CAMINHO` | Copia e verifica um executável local do Stockfish. |
 
+O script chama os compiladores diretamente, sem CMake. Ele baixa e verifica o Assimp 5.4.3, compila o importador FBX e a zlib em uma biblioteca estática e a vincula ao jogo. A primeira compilação demora mais; os objetos do Assimp e do GLFW ficam em cache para as próximas compilações. Não é necessário instalar Assimp nem copiar uma DLL.
+
 Os scripts `compilar.bat` e `compilar.sh` encaminham os argumentos para `tools/build.py`. Por exemplo, `./compilar.bat --run` no PowerShell ou `sh compilar.sh --run` no Linux/macOS.
 
 ### CMake
+
+Alternativa opcional ao script Python. Requer CMake 3.22 ou superior e aceita um pacote Assimp 5 instalado (`assimp_DIR`/`CMAKE_PREFIX_PATH`); caso não o encontre, baixa as fontes automaticamente.
 
 ```sh
 cmake -S . -B build/cmake
@@ -178,14 +183,16 @@ A descrição de cada parâmetro está em [assets/scenarios/README.md](assets/sc
 | `src/graphics/Application.cpp` | Janela, eventos, câmera, seleção, renderização e busca assíncrona. |
 | `src/graphics/ApplicationUI.cpp` | Painel de controles e resultado da partida em Dear ImGui. |
 | `src/graphics/` | Tabuleiro, mesa, skybox, cenários, malhas, objetos e shaders. |
-| `src/pieces/` | Modelagem e desenho de cada tipo de peça. |
+| `src/pieces/` | Associação de cada tipo de peça ao modelo e desenho. |
 | `include/` | Cabeçalhos da camada gráfica e operações matemáticas em `Math3D.h`. |
 | `shaders/` | Programas GLSL da cena, das sombras e da skybox. |
-| `assets/` | Configurações de cenário e imagens da skybox. |
+| `assets/` | Modelos das peças, configurações de cenário e imagens da skybox. |
 | `tools/` | Compilação e preparação dos pacotes do motor. |
 | `vendor/` | Dependências e pacotes do Stockfish. |
 
-As peças compartilham malhas de primitivas e definem sua forma por composição de objetos. A camada gráfica sincroniza o tabuleiro pela posição FEN. Enquanto o Stockfish calcula, a interface desenha uma cópia da posição e a tarefa em segundo plano acessa o jogo; se o motor falhar, o lance não é confirmado e a cena recupera a posição anterior.
+As peças usam os seis modelos FBX de `assets/objects/pieces/`, importados pelo Assimp com triangulação, normais e transformações dos nós aplicadas. Cada tipo compartilha uma malha na GPU entre os dois lados e as prévias de promoção. Os modelos são centralizados, apoiados no tabuleiro e ajustados proporcionalmente para caber nas casas; as cores continuam definidas pelo jogo. Falhas de importação exibem o caminho do modelo e o diagnóstico do Assimp.
+
+A camada gráfica sincroniza o tabuleiro pela posição FEN. Enquanto o Stockfish calcula, a interface desenha uma cópia da posição e a tarefa em segundo plano acessa o jogo; se o motor falhar, o lance não é confirmado e a cena recupera a posição anterior.
 
 ## Arquivos para execução
 
@@ -197,6 +204,7 @@ Para usar um Stockfish próprio, informe `--engine` ao script de compilação ou
 
 O código próprio está sob a [licença MIT](LICENSE). As dependências mantêm suas licenças e avisos nos respectivos diretórios:
 
+- [Assimp](vendor/Assimp-LICENSE.txt) (BSD de 3 cláusulas).
 - [GLFW](vendor/glfw/LICENSE.md).
 - GLAD: avisos nos arquivos em `vendor/glfw/deps/glad/`.
 - [Dear ImGui](vendor/imgui/LICENSE.txt).

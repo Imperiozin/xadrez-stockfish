@@ -17,7 +17,7 @@ class Application {
     std::unique_ptr<Shader> depthShader;
     std::unique_ptr<Skybox> skybox;
     GLuint shadowFramebuffer = 0, shadowMap = 0;
-    static constexpr int shadowResolution = 4096;
+    static constexpr int shadowResolution = 8192;
     void initializeShadows();
     void drawScene(Shader &sceneShader);
     std::unique_ptr<Primitives> primitives;

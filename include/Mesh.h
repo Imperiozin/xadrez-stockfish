@@ -2,6 +2,7 @@
 #include "Math3D.h"
 #include <glad/gl.h>
 #include <vector>
+#include <string>
 
 struct Vertex {
     Vec3 position, normal;
@@ -20,4 +21,5 @@ class Mesh {
     static std::vector<Vertex> cube();
     static std::vector<Vertex> cylinder(float topRadius = 1);
     static std::vector<Vertex> sphere();
+    static std::vector<Vertex> loadModel(const std::string &file, float height);
 };

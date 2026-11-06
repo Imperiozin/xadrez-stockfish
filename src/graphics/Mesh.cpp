@@ -1,7 +1,7 @@
 #include "Mesh.h"
+#include <assimp/defs.h>
 
 namespace {
-constexpr float pi = 3.14159265f;
 
 void tri(std::vector<Vertex> &v, Vec3 a, Vec3 b, Vec3 c, Vec3 na, Vec3 nb, Vec3 nc) {
     v.push_back({a, na});
@@ -51,7 +51,7 @@ std::vector<Vertex> Mesh::cylinder(float top) {
     std::vector<Vertex> v;
     constexpr int segments = 64;
     for (int i = 0; i < segments; ++i) {
-        float a = 2 * pi * i / segments, b = 2 * pi * (i + 1) / segments;
+        float a = AI_MATH_TWO_PI_F * i / segments, b = AI_MATH_TWO_PI_F * (i + 1) / segments;
         Vec3 p{std::cos(a), 0, std::sin(a)}, q{std::cos(b), 0, std::sin(b)},
             r{p.x * top, 1, p.z * top}, s{q.x * top, 1, q.z * top};
         auto n = normalized(Vec3{p.x, 1 - top, p.z}), m = normalized(Vec3{q.x, 1 - top, q.z});
@@ -73,8 +73,8 @@ std::vector<Vertex> Mesh::sphere() {
     constexpr int rings = 32, segments = 64;
     for (int j = 0; j < rings; ++j) {
         for (int i = 0; i < segments; ++i) {
-            float a = pi * j / rings, b = pi * (j + 1) / rings, c = 2 * pi * i / segments,
-                  d = 2 * pi * (i + 1) / segments;
+            float a = AI_MATH_PI_F * j / rings, b = AI_MATH_PI_F * (j + 1) / rings, c = AI_MATH_TWO_PI_F * i / segments,
+                  d = AI_MATH_TWO_PI_F * (i + 1) / segments;
             auto p = point(a, c), q = point(b, c), r = point(b, d), s = point(a, d);
             tri(v, p, q, r, p, q, r);
             tri(v, p, r, s, p, r, s);

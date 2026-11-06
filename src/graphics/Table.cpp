@@ -1,4 +1,5 @@
 #include "Table.h"
+#include <assimp/defs.h>
 #include <utility>
 
 void Table::addProp(std::unique_ptr<Object> prop) {
@@ -21,7 +22,7 @@ void Table::draw(Shader &shader, const Mat4 &parent) {
         timber({side * (width - rim) / 2, topCenter, 0},
                {rim, thickness, depth}, frameColor);
         timber({0, topCenter, side * (depth - rim) / 2},
-               {rim, thickness, innerWidth}, frameColor, 1.5707963f);
+               {rim, thickness, innerWidth}, frameColor, AI_MATH_HALF_PI_F);
     }
     constexpr int plankCount = 16;
     constexpr float gap = .055f;
@@ -42,7 +43,7 @@ void Table::draw(Shader &shader, const Mat4 &parent) {
         timber({x * (width / 2 - 1), surfaceY - thickness - .45f, 0},
                {.25f, .9f, depth - 2}, frameColor);
         timber({0, surfaceY - thickness - .45f, x * (depth / 2 - 1)},
-               {.25f, .9f, width - 2}, frameColor, 1.5707963f);
+               {.25f, .9f, width - 2}, frameColor, AI_MATH_HALF_PI_F);
     }
     for (auto &prop : props) prop->draw(shader, tableModel);
 }

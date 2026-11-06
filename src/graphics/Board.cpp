@@ -1,4 +1,5 @@
 #include "Board.h"
+#include <assimp/defs.h>
 #include <cctype>
 #include <stdexcept>
 
@@ -58,7 +59,7 @@ void Board::draw(Shader &s, const Mat4 &parent) {
             Vec3 color = i == selected ? Vec3{1.f, .68f, .15f} : Vec3{1.f, .08f, .06f};
             // Pequenas esferas formam um contorno continuo ao redor da base.
             for (int segment = 0; segment < 64; ++segment) {
-                float a = segment * 6.2831853f / 64;
+                float a = segment * AI_MATH_TWO_PI_F / 64;
                 primitives.draw(s, Primitive::Sphere, m,
                     {p.x + .38f * std::cos(a), .09f, p.z + .38f * std::sin(a)},
                     {.025f, .025f, .025f}, color);

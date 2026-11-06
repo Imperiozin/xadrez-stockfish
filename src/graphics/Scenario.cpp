@@ -1,4 +1,5 @@
 #include "Scenario.h"
+#include <assimp/defs.h>
 #include "stockfish.hpp"
 #include <fstream>
 #include <sstream>
@@ -64,10 +65,10 @@ Mat4 Scenario::lightViewProjection() const {
             throw std::runtime_error("Luz dentro do volume das sombras: afaste a luz ou desative shadowAutoFit");
         nearPlane = distance - shadowRadius;
         farPlane = distance + shadowRadius;
-        fov = 2.f * std::asin(shadowRadius / distance) * 180.f / 3.14159265f;
+        fov = 2.f * std::asin(shadowRadius / distance) * 180.f / AI_MATH_PI_F;
     }
     Mat4 projection;
-    const float f = 1.f / std::tan(fov * 3.14159265f / 360.f);
+    const float f = 1.f / std::tan(fov * AI_MATH_PI_F / 360.f);
     projection.v[0] = projection.v[5] = f;
     projection.v[10] = -(farPlane + nearPlane) / (farPlane - nearPlane);
     projection.v[11] = -1;

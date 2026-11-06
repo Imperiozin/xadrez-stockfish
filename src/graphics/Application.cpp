@@ -1,5 +1,6 @@
 #define GLAD_GL_IMPLEMENTATION
 #include <glad/gl.h>
+#include <assimp/defs.h>
 #undef GLAD_GL_IMPLEMENTATION
 #include "Application.h"
 #include "imgui.h"
@@ -446,7 +447,7 @@ void Application::drawPromotion() {
     int hovered = promotionChoice(mouseX, mouseY);
     glEnable(GL_SCISSOR_TEST);
     const Vec3 previewEye{0, 2.3f, 4.6f};
-    const float rotation = float(std::fmod(glfwGetTime() * .8, 6.2831853));
+    const float rotation = float(std::fmod(glfwGetTime() * .8, AI_MATH_TWO_PI));
     for (int i = 0; i < 4; ++i) {
         int x = int((.06f + i * .225f) * width);
         int y = int(.32f * height);

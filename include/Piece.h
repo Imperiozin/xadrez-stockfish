@@ -6,8 +6,7 @@ class Piece : public Object {
   protected:
     Primitives &primitives;
     Vec3 color;
-    void base(Shader &, const Mat4 &);
-    void part(Shader &, const Mat4 &, Primitive, Vec3, Vec3, float angle = 0);
+    void drawModel(Shader &, const Mat4 &, const char *file, float height, float rotation = 0);
 
   public:
     const bool white;

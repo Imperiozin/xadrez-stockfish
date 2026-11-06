@@ -1,4 +1,5 @@
 #include "Piece.h"
+#include <assimp/defs.h>
 #include "Bishop.h"
 #include "King.h"
 #include "Knight.h"
@@ -9,19 +10,12 @@
 
 Piece::Piece(Primitives &p, bool w)
     : primitives(p), color(w ? Vec3{.91f, .83f, .66f} : Vec3{.22f, .32f, .38f}), white(w) {
-    angle = w ? 0 : 3.14159265f;
+    angle = w ? 0 : AI_MATH_PI_F;
 }
 
-void Piece::part(Shader &s, const Mat4 &m, Primitive t, Vec3 p, Vec3 z, float a) {
-    primitives.draw(s, t, m, p, z, color, a);
-}
-
-void Piece::base(Shader &s, const Mat4 &m) {
-    part(s, m, Primitive::Cylinder, {0, 0, 0}, {.34f, .08f, .34f});
-    part(s, m, Primitive::Cylinder, {0, .08f, 0}, {.29f, .08f, .29f});
-    part(s, m, Primitive::Cone, {0, .16f, 0}, {.27f, .40f, .27f});
-    primitives.draw(s, Primitive::Cylinder, m, {0, .105f, 0}, {.298f, .025f, .298f},
-                    {.60f, .40f, .13f});
+void Piece::drawModel(Shader &s, const Mat4 &parent, const char *file, float height, float rotation) {
+    primitives.drawModel(s, std::string("assets/objects/pieces/") + file, height,
+                         model(parent) * transform({}, {1, 1, 1}, rotation), color);
 }
 
 std::unique_ptr<Piece> Piece::create(char c, Primitives &p) {
