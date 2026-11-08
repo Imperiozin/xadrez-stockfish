@@ -15,4 +15,6 @@ class Shader {
     void lighting(const Scenario &scenario);
     void shadows(const Mat4 &lightViewProjection, Vec3 lightPosition, GLuint depthMap);
     void object(const Mat4 &model, Vec3 color, bool wood = false);
+    void pageTexture(GLuint texture, float height);
+    void ruledPaper(Vec2 origin, Vec2 pixelScale);
 };

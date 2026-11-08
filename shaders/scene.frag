@@ -1,7 +1,13 @@
 #version 330 core
 
 in vec3 worldPosition;
+uniform bool pageTextureEnabled;
+uniform sampler2D pageTexture;
+uniform float pageHeight;
 in vec3 localPosition;
+in vec3 localNormal;
+uniform bool ruledPaperEnabled;
+uniform vec4 rulingMapping;
 uniform bool woodMaterial;
 in vec3 worldNormal;
 in vec4 lightSpacePosition;
@@ -51,6 +57,13 @@ float shadowAmount(vec3 normal, vec3 lightDirection) {
     return shadow / 9.0;
 }
 
+// Cobertura filtrada de um traço de dois pixels da textura original da UI.
+float rulingCoverage(float distanceToLine, float footprint) {
+    float filterWidth = max(footprint, 1.0);
+    return clamp((2.0 + filterWidth) * 0.5 - distanceToLine,
+                 0.0, min(2.0, filterWidth)) / filterWidth;
+}
+
 void main() {
     vec3 normal = normalize(worldNormal);
     vec3 lightDirection = normalize(lightPosition - worldPosition);
@@ -63,6 +76,28 @@ void main() {
     float specular = diffuse > 0.0 ? pow(max(dot(normal, halfwayDirection), 0.0), shininess) : 0.0;
     float visibility = 1.0 - shadowAmount(normal, lightDirection);
     vec3 materialColor = color;
+    if (ruledPaperEnabled) {
+        // Coordenadas locais: as pautas acompanham o bloco e a curva do papel.
+        vec2 paperPixel = (localPosition.xz - rulingMapping.xy) * rulingMapping.zw;
+        vec2 footprint = fwidth(paperPixel);
+        float topFace = smoothstep(0.15, 0.65, normalize(localNormal).y);
+        float sideMargin = step(18.0, paperPixel.x) * step(paperPixel.x, 750.0);
+        float distanceToRule = abs(mod(paperPixel.y - 168.0 + 38.0, 76.0) - 38.0);
+        float rule = rulingCoverage(distanceToRule, footprint.y) * sideMargin * topFace;
+        materialColor = mix(materialColor, vec3(96.0, 131.0, 160.0) / 255.0, rule * (95.0 / 255.0));
+        float margin = rulingCoverage(abs(paperPixel.x - 82.0), footprint.x) * topFace;
+        materialColor = mix(materialColor, vec3(187.0, 87.0, 77.0) / 255.0, margin * (75.0 / 255.0));
+    }
+    if (pageTextureEnabled) {
+        vec2 uv = (localPosition.xz - rulingMapping.xy) * rulingMapping.zw / vec2(768.0, 640.0);
+        vec4 ink = texture(pageTexture, clamp(vec2(uv.x, 1.0 - uv.y), vec2(0.0), vec2(1.0)));
+        // A UI usa a própria superfície da folha, sem um retângulo sobreposto.
+        if (all(greaterThanEqual(uv, vec2(0.0))) && all(lessThanEqual(uv, vec2(1.0))) &&
+            abs(localPosition.y - pageHeight) < 0.0005 && normalize(localNormal).y > 0.99) {
+            // O framebuffer do ImGui contém cor pré-multiplicada pelo alfa.
+            materialColor = materialColor * (1.0 - ink.a) + ink.rgb;
+        }
+    }
     if (woodMaterial) {
         float warp = sin(localPosition.z * 9.0 + localPosition.x * 5.0) * .65
                    + sin(localPosition.z * 23.0) * .18;

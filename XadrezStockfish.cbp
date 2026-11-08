@@ -60,6 +60,11 @@
         <Unit filename="src/graphics/Mesh.cpp">
             <Option compilerVar="CPP" />
         </Unit>
+        <Unit filename="src/graphics/Notepad.cpp">
+            <Option compilerVar="CPP" />
+        </Unit>
+        <Unit filename="include/Notepad.h" />
+        <Unit filename="include/Ray.h" />
         <Unit filename="src/graphics/Object.cpp">
             <Option compilerVar="CPP" />
         </Unit>

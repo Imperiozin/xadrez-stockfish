@@ -2,6 +2,7 @@
 
 layout(location = 0) in vec3 position;
 layout(location = 1) in vec3 normal;
+layout(location = 2) in vec2 uv;
 
 uniform mat4 model;
 uniform mat4 viewProjection;
@@ -10,6 +11,7 @@ uniform float shadowNormalOffset;
 
 out vec3 worldPosition;
 out vec3 localPosition;
+out vec3 localNormal;
 out vec3 worldNormal;
 out vec4 lightSpacePosition;
 
@@ -23,6 +25,7 @@ void main() {
         transformedPosition.xyz + surfaceNormal * shadowNormalOffset, 1.0);
     worldPosition = transformedPosition.xyz;
     localPosition = position;
+    localNormal = normal;
     worldNormal = normalMatrix * normal;
     gl_Position = viewProjection * transformedPosition;
 }

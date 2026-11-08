@@ -3,6 +3,7 @@
 #include "imgui_impl_glfw.h"
 #include "imgui_impl_opengl3.h"
 
+#include <algorithm>
 #include <stdexcept>
 
 void Application::initializeInterface() {
@@ -39,9 +40,32 @@ void Application::initializeInterface() {
 }
 
 bool Application::interfaceCapturesMouse(double x, double y) const {
-    return ImGui::GetCurrentContext() &&
-           (ImGui::GetIO().WantCaptureMouse ||
-            (x >= 0 && x < ImGui::GetIO().DisplaySize.x && y >= 0 && y < toolbarHeight));
+    return (ImGui::GetCurrentContext() && ImGui::GetIO().WantCaptureMouse) ||
+           (promotionPrefix.empty() && notepad &&
+            (notepad->capturesPointer() || notepadHit(x, y).body));
+}
+
+void Application::updateMouseCursor() {
+    if (dragging || !glfwGetWindowAttrib(window, GLFW_FOCUSED) ||
+        !glfwGetWindowAttrib(window, GLFW_HOVERED)) {
+        ImGui::SetMouseCursor(ImGuiMouseCursor_Arrow);
+        return;
+    }
+    // Os controles do painel definem o próprio cursor e têm prioridade sobre a cena.
+    if (ImGui::GetIO().WantCaptureMouse) return;
+
+    bool selectable = false;
+    if (!promotionPrefix.empty()) {
+        selectable = !finished && !pending.valid() && promotionChoice(mouseX, mouseY) >= 0;
+    } else if (notepad && (notepad->capturesPointer() || notepadHit(mouseX, mouseY).body)) {
+        selectable = notepad->wantsPointerCursor();
+    } else if (!finished && !pending.valid()) {
+        const int square = pick(mouseX, mouseY);
+        selectable = board->isWhite(square) ||
+            std::find(board->destinations.begin(), board->destinations.end(), square) !=
+                board->destinations.end();
+    }
+    if (selectable) ImGui::SetMouseCursor(ImGuiMouseCursor_Hand);
 }
 
 void Application::setDifficulty(int level) {
@@ -78,41 +102,12 @@ void Application::drawInterface() {
         }
     };
 
-    ImGui::SetNextWindowPos(ImVec2(0, 0));
-    ImGui::SetNextWindowSize(ImVec2(io.DisplaySize.x, 0));
-    ImGui::Begin("Controles da partida###toolbar", nullptr, flags);
-
-    // Quebra as opções em mais linhas quando a janela fica estreita.
-    auto sameLineIfFits = [&style](float itemWidth) {
-        float right = ImGui::GetWindowPos().x + ImGui::GetWindowContentRegionMax().x;
-        if (ImGui::GetItemRectMax().x + style.ItemSpacing.x + itemWidth <= right) {
-            ImGui::SameLine();
-        }
-    };
-
-    // O worker é o único que acessa Jogo durante a busca do Stockfish.
-    ImGui::BeginDisabled(pending.valid());
-    if (ImGui::Button("Novo Jogo")) newGame();
-    sameLineIfFits(ImGui::CalcTextSize("Dificuldade:").x);
-    ImGui::AlignTextToFramePadding();
-    ImGui::TextUnformatted("Dificuldade:");
-    const struct { const char *label; int level; } levels[] = {
-        {"Iniciante", -20}, {"Fácil", -10}, {"Intermediário", 0},
-        {"Difícil", 10}, {"Impossível", 20}
-    };
-    for (const auto &level : levels) {
-        sameLineIfFits(ImGui::CalcTextSize(level.label).x + ImGui::GetFrameHeight() + style.ItemInnerSpacing.x);
-        if (ImGui::RadioButton(level.label, interfaceDifficulty == level.level)) {
-            setDifficulty(level.level);
-        }
-    }
-
-    ImGui::EndDisabled();
-    ImGui::Separator();
+    ImGui::SetNextWindowPos(ImVec2(12, io.DisplaySize.y - 12), ImGuiCond_Always, ImVec2(0, 1));
+    ImGui::SetNextWindowSize(ImVec2(std::max(1.f, std::min(600.f, io.DisplaySize.x - 24)), 0));
+    ImGui::Begin("Estado da partida###status", nullptr, flags | ImGuiWindowFlags_NoInputs);
     ImGui::PushTextWrapPos(0);
     ImGui::TextUnformatted(status.c_str());
     ImGui::PopTextWrapPos();
-    toolbarHeight = ImGui::GetWindowSize().y;
     ImGui::End();
 
     if (!finished) return;
@@ -143,6 +138,7 @@ void Application::drawInterface() {
     const float buttonWidth = 150.f;
     ImGui::SetCursorPosX(std::max(ImGui::GetCursorPosX(), (resultWidth - buttonWidth) * .5f));
     if (ImGui::Button("Novo Jogo###resultNewGame", ImVec2(buttonWidth, 0))) newGame();
+    if (ImGui::IsItemHovered()) ImGui::SetMouseCursor(ImGuiMouseCursor_Hand);
     ImGui::End();
     ImGui::PopStyleVar(2);
 }

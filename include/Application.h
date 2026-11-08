@@ -4,6 +4,7 @@
 #include "Board.h"
 #include "Skybox.h"
 #include "Table.h"
+#include "Notepad.h"
 #include "jogo.hpp"
 #include <GLFW/glfw3.h>
 #include <future>
@@ -23,12 +24,12 @@ class Application {
     std::unique_ptr<Primitives> primitives;
     std::unique_ptr<Board> board;
     std::unique_ptr<Table> table;
+    Notepad *notepad = nullptr; // A mesa possui o objeto; este ponteiro apenas encaminha eventos.
     std::future<std::unique_ptr<RespostaMovimento>> pending;
     std::vector<std::string> legal;
     std::string cachedFen, status = "Sua vez: selecione uma peça branca", promotionPrefix;
     std::string resultTitle, resultReason;
     int interfaceDifficulty = 0, interfaceThinkTime = 300;
-    float toolbarHeight = 0;
     bool finished = false, dragging = false;
     double mouseX = 0, mouseY = 0;
     float yaw = 0, pitch = .65f, distance = 32;
@@ -37,13 +38,19 @@ class Application {
     double lastFrame = 0;
     std::array<std::unique_ptr<Piece>, 4> promotionPieces;
     Vec3 eye() const;
+    Ray pointerRay(double x, double y) const;
+    Notepad::Hit notepadHit(double x, double y) const;
+    void updateNotepadPointer(double x, double y);
+    void drawNotepadInterface(float dt);
     void constrainCamera();
     void moveCamera(float dt);
     void cancelSelection();
     int promotionChoice(double x, double y) const;
     void drawPromotion();
     void initializeInterface();
+    void initializeInput();
     void drawInterface();
+    void updateMouseCursor();
     bool interfaceCapturesMouse(double x, double y) const;
     void setDifficulty(int level);
     void setThinkTime(int milliseconds);

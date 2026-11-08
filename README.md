@@ -88,6 +88,8 @@ cmake -S . -B build/cmake
 cmake --build build/cmake --config Release
 ```
 
+O CMake também compila a verificação matemática do bloco de notas. Execute-a com `ctest --test-dir build/cmake -C Release --output-on-failure`.
+
 O executável e seus recursos ficam em `build/cmake/bin/`, inclusive nos geradores com múltiplas configurações. No Windows, execute `./build/cmake/bin/xadrez.exe`; no Linux/macOS, `./build/cmake/bin/xadrez`.
 
 Para MinGW no Windows, use `-G "MinGW Makefiles"` na configuração e mantenha suas ferramentas no `PATH`. Para MSVC, use um ambiente de desenvolvimento do Visual Studio.
@@ -116,11 +118,15 @@ A peça selecionada recebe um contorno dourado. Capturas legais são marcadas co
 | Subir ou descer a câmera | `Shift` + seta para cima ou para baixo. |
 | Aproximar ou afastar | Roda do mouse. |
 | Restaurar a câmera inicial | `Home`. |
-| Iniciar outra partida | Botão **Novo Jogo**. |
-| Alterar a dificuldade | Opções no painel superior. |
+| Iniciar outra partida | Linha **Nova partida** no bloco sobre a mesa ou botão no resultado final. |
+| Alterar a dificuldade | Clique diretamente na linha desejada na folha do bloco. |
 | Cancelar promoção; fora dela, sair | `Esc`. |
 
 Durante a busca do motor, os controles de nova partida e dificuldade ficam desabilitados. A câmera continua disponível. Reiniciar a partida preserva a dificuldade e o tempo de pensamento escolhidos.
+
+O bloco usa o modelo `assets/objects/NotepadwithRingbindings.fbx`. As pautas e a margem cobrem a folha de cima a baixo, acompanhando sua curvatura. Os textos e as marcações são desenhados com Dear ImGui em uma textura aplicada diretamente à malha da folha, com a mesma iluminação e sem aproximar a câmera. A fonte Schoolbell está incluída em `assets/fonts/`, com sua licença, e pode ser trocada no carregamento de `Notepad.cpp`. As texturas externas citadas pelo FBX não são necessárias. A rotação com o botão do meio e o zoom continuam disponíveis com o mouse sobre o bloco.
+
+Para posicionar o conjunto, altere `pad->position`, `pad->rotation` e `pad->scale` na inicialização de `Application.cpp`. As rotações usam radianos. O modelo, a interface e as áreas clicáveis compartilham essa transformação e também herdam a transformação da mesa. Escalas não uniformes são aceitas; uma escala nula desabilita a interação. A parte curva da folha e a espiral podem ocultar os controles e bloquear cliques.
 
 ## Dificuldade e opções de execução
 
@@ -181,10 +187,12 @@ A descrição de cada parâmetro está em [assets/scenarios/README.md](assets/sc
 | `src/jogo.cpp` e `src/jogo.hpp` | Regras, lances legais, histórico e dificuldade. |
 | `src/stockfish.cpp` e `src/stockfish.hpp` | Processo do Stockfish e comunicação UCI. |
 | `src/graphics/Application.cpp` | Janela, eventos, câmera, seleção, renderização e busca assíncrona. |
-| `src/graphics/ApplicationUI.cpp` | Painel de controles e resultado da partida em Dear ImGui. |
+| `src/graphics/ApplicationUI.cpp` | Estado da partida e resultado final em Dear ImGui. |
+| `src/graphics/Notepad.cpp` | Bloco 3D, textura da interface e seleção das linhas na folha. |
 | `src/graphics/` | Tabuleiro, mesa, skybox, cenários, malhas, objetos e shaders. |
 | `src/pieces/` | Associação de cada tipo de peça ao modelo e desenho. |
 | `include/` | Cabeçalhos da camada gráfica e operações matemáticas em `Math3D.h`. |
+| `tests/notepad_math.cpp` | Verificação de cliques com rotação, escala e transformações herdadas. |
 | `shaders/` | Programas GLSL da cena, das sombras e da skybox. |
 | `assets/` | Modelos das peças, configurações de cenário e imagens da skybox. |
 | `tools/` | Compilação e preparação dos pacotes do motor. |
@@ -208,6 +216,8 @@ O código próprio está sob a [licença MIT](LICENSE). As dependências mantêm
 - [GLFW](vendor/glfw/LICENSE.md).
 - GLAD: avisos nos arquivos em `vendor/glfw/deps/glad/`.
 - [Dear ImGui](vendor/imgui/LICENSE.txt).
+- Fonte Schoolbell, usada no bloco de notas: [Apache License 2.0](assets/fonts/LICENSE-Schoolbell.txt).
+- Fonte Playwrite Brasil, incluída como recurso: [SIL Open Font License 1.1](assets/fonts/OFL-PlaywriteBR.txt).
 - [chess-library](vendor/chess-library/LICENSE).
 - [ghc-filesystem](vendor/ghc-filesystem/LICENSE).
 - Stockfish: GPLv3, com fontes e `Copying.txt` em cada pacote de `vendor/stockfish/`.

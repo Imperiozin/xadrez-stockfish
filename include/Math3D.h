@@ -2,6 +2,10 @@
 #include <algorithm>
 #include <cmath>
 
+struct Vec2 {
+    float x = 0, y = 0;
+};
+
 struct Vec3 {
     float x = 0, y = 0, z = 0;
 
@@ -64,6 +68,48 @@ inline Mat4 transform(Vec3 p, Vec3 s, float angle = 0) {
     m.v[13] = p.y;
     m.v[14] = p.z;
     return m;
+}
+
+// Ângulos em radianos; mantém a convenção de rotação Y já usada na cena.
+inline Mat4 transform(Vec3 p, Vec3 s, Vec3 rotation) {
+    auto rx = Mat4::identity(), rz = Mat4::identity();
+    rx.v[5] = rx.v[10] = std::cos(rotation.x);
+    rx.v[6] = std::sin(rotation.x);
+    rx.v[9] = -rx.v[6];
+    rz.v[0] = rz.v[5] = std::cos(rotation.z);
+    rz.v[1] = std::sin(rotation.z);
+    rz.v[4] = -rz.v[1];
+    return transform(p, {1, 1, 1}, rotation.y) * rx * rz * transform({}, s);
+}
+
+inline Vec3 transformPoint(const Mat4 &m, Vec3 p) {
+    return {m.v[0] * p.x + m.v[4] * p.y + m.v[8] * p.z + m.v[12],
+            m.v[1] * p.x + m.v[5] * p.y + m.v[9] * p.z + m.v[13],
+            m.v[2] * p.x + m.v[6] * p.y + m.v[10] * p.z + m.v[14]};
+}
+
+inline Vec3 transformDirection(const Mat4 &m, Vec3 p) {
+    return transformPoint(m, p) - transformPoint(m, {});
+}
+
+// Inversa afim geral: aceita escalas não uniformes e transformações herdadas.
+inline bool inverseAffine(const Mat4 &m, Mat4 &inverse) {
+    Vec3 a{m.v[0], m.v[1], m.v[2]}, b{m.v[4], m.v[5], m.v[6]},
+         c{m.v[8], m.v[9], m.v[10]};
+    const float determinant = dot(a, cross(b, c));
+    const float magnitude = std::sqrt(dot(a, a) * dot(b, b) * dot(c, c));
+    if (!std::isfinite(determinant) || magnitude == 0 ||
+        std::abs(determinant) <= magnitude * 1e-6f) return false;
+    Vec3 rows[] = {cross(b, c) * (1 / determinant), cross(c, a) * (1 / determinant),
+                   cross(a, b) * (1 / determinant)};
+    inverse = Mat4::identity();
+    for (int i = 0; i < 3; ++i) {
+        inverse.v[i] = rows[i].x;
+        inverse.v[4 + i] = rows[i].y;
+        inverse.v[8 + i] = rows[i].z;
+        inverse.v[12 + i] = -dot(rows[i], {m.v[12], m.v[13], m.v[14]});
+    }
+    return true;
 }
 
 inline Mat4 perspective(float aspect) {

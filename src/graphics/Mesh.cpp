@@ -21,6 +21,9 @@ Mesh::Mesh(const std::vector<Vertex> &v) : count(static_cast<GLsizei>(v.size()))
     glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, sizeof(Vertex),
                           reinterpret_cast<void *>(sizeof(Vec3)));
     glEnableVertexAttribArray(1);
+    glVertexAttribPointer(2, 2, GL_FLOAT, GL_FALSE, sizeof(Vertex),
+                          reinterpret_cast<void *>(2 * sizeof(Vec3)));
+    glEnableVertexAttribArray(2);
 }
 
 Mesh::~Mesh() {

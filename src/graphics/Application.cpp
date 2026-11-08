@@ -34,6 +34,8 @@ Application::~Application() {
         pending.wait();
     }
 
+    table.reset();
+    notepad = nullptr;
     if (ImGui::GetCurrentContext()) {
         if (ImGui::GetIO().BackendRendererUserData) ImGui_ImplOpenGL3_Shutdown();
         if (ImGui::GetIO().BackendPlatformUserData) ImGui_ImplGlfw_Shutdown();
@@ -42,7 +44,6 @@ Application::~Application() {
 
     for (auto &piece : promotionPieces) piece.reset();
     board.reset();
-    table.reset();
     primitives.reset();
     shader.reset();
     depthShader.reset();
@@ -61,6 +62,71 @@ Vec3 Application::eye() const {
             distance * std::cos(pitch) * std::cos(yaw)};
 }
 
+Ray Application::pointerRay(double x, double y) const {
+    int w, h;
+    glfwGetWindowSize(window, &w, &h);
+    const auto e = eye();
+    if (w <= 0 || h <= 0) return {e, {0, 1, 0}};
+    const auto forward = normalized(cameraTarget - e);
+    const auto right = normalized(cross(forward, {0, 1, 0}));
+    const auto up = cross(right, forward);
+    const float nx = float(2 * x / w - 1), ny = float(1 - 2 * y / h);
+    const float tangent = std::tan(.65f / 2);
+    return {e, normalized(forward + right * (nx * float(w) / h * tangent) + up * (ny * tangent))};
+}
+
+Notepad::Hit Application::notepadHit(double x, double y) const {
+    if (!notepad || !table) return {};
+    int w, h;
+    glfwGetWindowSize(window, &w, &h);
+    if (x < 0 || y < 0 || x >= w || y >= h) return {};
+    const auto ray = pointerRay(x, y);
+    const auto parent = table->model(Mat4::identity());
+    auto hit = notepad->hit(ray, parent);
+    if (hit.body && board) {
+        Mat4 boardInverse;
+        if (inverseAffine(board->model(Mat4::identity()), boardInverse)) {
+            const auto local = transformRay(boardInverse, ray);
+            float distance;
+            if ((intersectBox(local, {-4.6f, -.705f, -4.6f}, {4.6f, -.055f, 4.6f}, distance) &&
+                 distance < hit.distance) ||
+                (intersectBox(local, {-4, -.03f, -4}, {4, .03f, 4}, distance) &&
+                 distance < hit.distance)) return {};
+        }
+    }
+    // A mesa deve ocultar os controles ao observar o bloco por baixo.
+    Mat4 inverse;
+    if (hit.body && inverseAffine(parent, inverse)) {
+        const auto local = transformRay(inverse, ray);
+        if (std::abs(local.direction.y) > .000001f) {
+            const float t = (Table::surfaceY - local.origin.y) / local.direction.y;
+            const auto p = local.origin + local.direction * t;
+            if (t > 0 && t < hit.distance && std::abs(p.x) <= Table::width / 2 &&
+                std::abs(p.z) <= Table::depth / 2) return {};
+        }
+    }
+    return hit;
+}
+
+void Application::updateNotepadPointer(double x, double y) {
+    if (notepad) notepad->pointer(notepadHit(x, y), promotionPrefix.empty() && !finished && !dragging &&
+        !(ImGui::GetCurrentContext() && ImGui::GetIO().WantCaptureMouse));
+}
+
+void Application::drawNotepadInterface(float dt) {
+    if (!notepad) return;
+    updateNotepadPointer(mouseX, mouseY);
+    const auto action = notepad->renderInterface(dt, interfaceDifficulty,
+        pending.valid() || finished || !promotionPrefix.empty());
+    if (action.changeDifficulty) setDifficulty(action.difficulty);
+    if (action.newGame) {
+        try { reset(); }
+        catch (const std::exception &e) {
+            status = std::string("Erro ao iniciar uma nova partida: ") + e.what();
+        }
+    }
+}
+
 void Application::refresh() {
     cachedFen = game.fen();
     legal = game.movimentosValidos();
@@ -72,20 +138,8 @@ void Application::refresh() {
 }
 
 int Application::pick(double x, double y) const {
-    int w, h;
-    glfwGetWindowSize(window, &w, &h);
-    if (w <= 0 || h <= 0) {
-        return -1;
-    }
-    auto e = eye();
-    auto forward = normalized(cameraTarget - e);
-    auto right = normalized(cross(forward, {0, 1, 0}));
-    auto up = cross(right, forward);
-    float nx = float(2 * x / w - 1);
-    float ny = float(1 - 2 * y / h);
-    float tangent = std::tan(.65f / 2);
-
-    Vec3 ray = normalized(forward + right * (nx * float(w) / h * tangent) + up * (ny * tangent));
+    const auto pointer = pointerRay(x, y);
+    const auto e = pointer.origin, ray = pointer.direction;
     if (ray.y >= -.0001f) {
         return -1;
     }
@@ -280,6 +334,84 @@ void Application::render() {
     ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
 }
 
+void Application::initializeInput() {
+    // Eventos de mouse, câmera e teclado.
+    glfwSetWindowUserPointer(window, this);
+    glfwSetWindowFocusCallback(window, [](GLFWwindow *w, int focused) {
+        auto &a = *static_cast<Application *>(glfwGetWindowUserPointer(w));
+        if (a.notepad) a.notepad->focus(focused == GLFW_TRUE);
+        if (!focused) a.dragging = false;
+    });
+    glfwSetMouseButtonCallback(window, [](GLFWwindow *w, int button, int action, int) {
+        auto &a = *static_cast<Application *>(glfwGetWindowUserPointer(w));
+        double x, y;
+        glfwGetCursorPos(w, &x, &y);
+        // O bloco recebe o botão esquerdo; o botão do meio pertence à câmera.
+        if (button == GLFW_MOUSE_BUTTON_MIDDLE) {
+            if (action == GLFW_RELEASE) a.dragging = false;
+            else if (action == GLFW_PRESS &&
+                     !(ImGui::GetCurrentContext() && ImGui::GetIO().WantCaptureMouse)) {
+                a.dragging = true;
+                a.mouseX = x;
+                a.mouseY = y;
+            }
+            a.updateNotepadPointer(x, y);
+            return;
+        }
+        a.updateNotepadPointer(x, y);
+        if (button == GLFW_MOUSE_BUTTON_LEFT && a.notepad)
+            a.notepad->mouseButton(action == GLFW_PRESS);
+        if (a.dragging || a.interfaceCapturesMouse(x, y)) return;
+        if (button == GLFW_MOUSE_BUTTON_LEFT && action == GLFW_PRESS) {
+            if (!a.promotionPrefix.empty()) {
+                int choice = a.promotionChoice(x, y);
+                if (choice >= 0) a.submit(a.promotionPrefix + "qrbn"[choice]);
+            } else a.click(a.pick(x, y));
+        }
+        if (button == GLFW_MOUSE_BUTTON_RIGHT && action == GLFW_PRESS) a.cancelSelection();
+    });
+
+    glfwSetCursorPosCallback(window, [](GLFWwindow *w, double x, double y) {
+        auto &a = *static_cast<Application *>(glfwGetWindowUserPointer(w));
+        // Um arraste já iniciado continua ao atravessar a folha ou um painel.
+        if (a.dragging) {
+            a.yaw -= float(x - a.mouseX) * .006f;
+            a.pitch = std::clamp(a.pitch + float(y - a.mouseY) * .006f, -.20f, 1.53f);
+            a.constrainCamera();
+            a.board->hovered = -1;
+            a.mouseX = x;
+            a.mouseY = y;
+            a.updateNotepadPointer(x, y);
+            return;
+        }
+        a.updateNotepadPointer(x, y);
+        if (a.interfaceCapturesMouse(x, y)) {
+            a.board->hovered = -1;
+            a.mouseX = x;
+            a.mouseY = y;
+            return;
+        }
+        a.constrainCamera();
+        a.board->hovered = !a.finished && a.promotionPrefix.empty() ? a.pick(x, y) : -1;
+        a.mouseX = x;
+        a.mouseY = y;
+    });
+
+    glfwSetScrollCallback(window, [](GLFWwindow *w, double, double y) {
+        auto &a = *static_cast<Application *>(glfwGetWindowUserPointer(w));
+        if (ImGui::GetCurrentContext() && ImGui::GetIO().WantCaptureMouse) return;
+        a.distance = std::clamp(a.distance - float(y), 4.f, 45.f);
+        a.constrainCamera();
+    });
+
+    glfwSetKeyCallback(window, [](GLFWwindow *w, int key, int, int action, int) {
+        if (ImGui::GetCurrentContext() && ImGui::GetIO().WantCaptureKeyboard) return;
+        if (action == GLFW_PRESS || action == GLFW_REPEAT) {
+            static_cast<Application *>(glfwGetWindowUserPointer(w))->key(key);
+        }
+    });
+}
+
 int Application::run() {
     // Inicializacao da janela e do contexto OpenGL.
     glfwSetErrorCallback([](int, const char *message) {
@@ -310,69 +442,22 @@ int Application::run() {
     primitives = std::make_unique<Primitives>();
     board = std::make_unique<Board>(*primitives);
     table = std::make_unique<Table>();
+    auto pad = std::make_unique<Notepad>();
+    // Único ponto de configuração do bloco: modelo, texto e cliques seguem juntos.
+    pad->position = {7.3f, Table::surfaceY + .025f, 3.7f};
+    pad->rotation = {0, -.10f - 10.f * AI_MATH_PI_F / 180.f, 0}; // Mais 10° no sentido horário.
+    pad->scale = {1, 1, 1};
+    notepad = pad.get();
+    table->addProp(std::move(pad));
     const char symbols[] = "QRBN";
     for (int i = 0; i < 4; ++i) promotionPieces[i] = Piece::create(symbols[i], *primitives);
     refresh();
 
-    // Eventos de mouse, camera e teclado.
-    glfwSetWindowUserPointer(window, this);
-    glfwSetMouseButtonCallback(window, [](GLFWwindow *w, int button, int action, int) {
-        auto &a = *static_cast<Application *>(glfwGetWindowUserPointer(w));
-        double x, y;
-        glfwGetCursorPos(w, &x, &y);
-        if (button == GLFW_MOUSE_BUTTON_MIDDLE && action == GLFW_RELEASE) a.dragging = false;
-        if (a.interfaceCapturesMouse(x, y)) return;
-        if (button == GLFW_MOUSE_BUTTON_LEFT && action == GLFW_PRESS) {
-            if (!a.promotionPrefix.empty()) {
-                int choice = a.promotionChoice(x, y);
-                if (choice >= 0) a.submit(a.promotionPrefix + "qrbn"[choice]);
-            } else a.click(a.pick(x, y));
-        }
-        if (button == GLFW_MOUSE_BUTTON_RIGHT && action == GLFW_PRESS) a.cancelSelection();
-        if (button == GLFW_MOUSE_BUTTON_MIDDLE) {
-            a.dragging = action == GLFW_PRESS;
-            a.mouseX = x;
-            a.mouseY = y;
-        }
-    });
-
-    glfwSetCursorPosCallback(window, [](GLFWwindow *w, double x, double y) {
-        auto &a = *static_cast<Application *>(glfwGetWindowUserPointer(w));
-        if (a.interfaceCapturesMouse(x, y)) {
-            a.dragging = false;
-            a.board->hovered = -1;
-            a.mouseX = x;
-            a.mouseY = y;
-            return;
-        }
-        if (a.dragging) {
-            a.yaw -= float(x - a.mouseX) * .006f;
-            a.pitch = std::clamp(a.pitch + float(y - a.mouseY) * .006f, -.20f, 1.53f);
-        }
-        a.constrainCamera();
-        a.board->hovered = !a.finished && a.promotionPrefix.empty() ? a.pick(x, y) : -1;
-        a.mouseX = x;
-        a.mouseY = y;
-    });
-
-    glfwSetScrollCallback(window, [](GLFWwindow *w, double, double y) {
-        auto &a = *static_cast<Application *>(glfwGetWindowUserPointer(w));
-        double x, cursorY;
-        glfwGetCursorPos(w, &x, &cursorY);
-        if (a.interfaceCapturesMouse(x, cursorY)) return;
-        a.distance = std::clamp(a.distance - float(y), 4.f, 45.f);
-        a.constrainCamera();
-    });
-
-    glfwSetKeyCallback(window, [](GLFWwindow *w, int key, int, int action, int) {
-        if (ImGui::GetCurrentContext() && ImGui::GetIO().WantCaptureKeyboard) return;
-        if (action == GLFW_PRESS || action == GLFW_REPEAT) {
-            static_cast<Application *>(glfwGetWindowUserPointer(w))->key(key);
-        }
-    });
+    initializeInput();
 
     // O backend encadeia os callbacks acima e recebe todos os eventos da interface.
     initializeInterface();
+    notepad->initializeInterface();
 
     // Loop principal: atualiza o jogo, desenha a cena e processa eventos.
     while (!glfwWindowShouldClose(window)) {
@@ -385,7 +470,9 @@ int Application::run() {
         ImGui_ImplGlfw_NewFrame();
         ImGui::NewFrame();
         moveCamera(dt);
+        drawNotepadInterface(dt);
         drawInterface();
+        updateMouseCursor();
         ImGui::Render();
         render();
         glfwSwapBuffers(window);

@@ -9,7 +9,7 @@ namespace {
 std::string readShader(const arquivos::path &path) {
     std::ifstream file(path.string());
     if (!file) {
-        throw std::runtime_error("Nao foi possivel abrir o shader: " + path.string());
+        throw std::runtime_error("Não foi possível abrir o shader: " + path.string());
     }
     std::ostringstream source;
     source << file.rdbuf();
@@ -97,9 +97,26 @@ void Shader::lighting(const Scenario &scene) {
 }
 
 void Shader::object(const Mat4 &m, Vec3 c, bool wood) {
+    glUniform1i(glGetUniformLocation(id, "pageTextureEnabled"), GL_FALSE);
+    glUniform1i(glGetUniformLocation(id, "ruledPaperEnabled"), GL_FALSE);
     glUniform1i(glGetUniformLocation(id, "woodMaterial"), wood);
     glUniformMatrix4fv(glGetUniformLocation(id, "model"), 1, GL_FALSE, m.v);
     glUniform3f(glGetUniformLocation(id, "color"), c.x, c.y, c.z);
+}
+
+void Shader::pageTexture(GLuint texture, float height) {
+    glUniform1i(glGetUniformLocation(id, "pageTextureEnabled"), GL_TRUE);
+    glUniform1f(glGetUniformLocation(id, "pageHeight"), height);
+    glUniform1i(glGetUniformLocation(id, "pageTexture"), 1);
+    glActiveTexture(GL_TEXTURE1);
+    glBindTexture(GL_TEXTURE_2D, texture);
+    glActiveTexture(GL_TEXTURE0);
+}
+
+void Shader::ruledPaper(Vec2 origin, Vec2 pixelScale) {
+    glUniform1i(glGetUniformLocation(id, "ruledPaperEnabled"), GL_TRUE);
+    glUniform4f(glGetUniformLocation(id, "rulingMapping"), origin.x, origin.y,
+                pixelScale.x, pixelScale.y);
 }
 
 void Shader::shadows(const Mat4 &lightViewProjection, Vec3 lightPosition, GLuint depthMap) {
