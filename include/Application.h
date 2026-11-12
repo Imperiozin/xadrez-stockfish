@@ -54,7 +54,7 @@ class Application {
     bool interfaceCapturesMouse(double x, double y) const;
     void setDifficulty(int level);
     void setThinkTime(int milliseconds);
-    void refresh();
+    void refresh(const std::string &move = "");
     void click(int square);
     void submit(const std::string &move);
     void update();

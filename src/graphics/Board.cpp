@@ -17,7 +17,7 @@ void Board::sync(const std::string &fen) {
             file += c - '0';
         } else {
             if (rank < 0 || file > 7) {
-                throw std::runtime_error("FEN invalida");
+                throw std::runtime_error("FEN inválida");
             }
             next[rank * 8 + file++] = c;
         }
@@ -31,6 +31,71 @@ void Board::sync(const std::string &fen) {
         }
     }
     symbols = next;
+    motions.clear();
+    animationFen.clear();
+    animationTime = 0;
+}
+
+void Board::animateMove(const std::string &move, const std::string &fen) {
+    auto validSquare = [](char file, char rank) {
+        return file >= 'a' && file <= 'h' && rank >= '1' && rank <= '8';
+    };
+    if (isAnimating() || (move.size() != 4 && move.size() != 5) ||
+        !validSquare(move[0], move[1]) || !validSquare(move[2], move[3])) {
+        sync(fen);
+        return;
+    }
+    const int from = (move[1] - '1') * 8 + move[0] - 'a';
+    const int to = (move[3] - '1') * 8 + move[2] - 'a';
+    if (!pieces[from] || from == to) {
+        sync(fen);
+        return;
+    }
+
+    const auto type = std::tolower(static_cast<unsigned char>(symbols[from]));
+    motions.push_back({from, to, pieces[from]->position, type == 'n' ? 1.4f : .28f});
+    if (type == 'k' && std::abs(to - from) == 2) {
+        // No roque, rei e torre viajam juntos até suas casas finais.
+        const int rookFrom = from / 8 * 8 + (to > from ? 7 : 0);
+        const int rookTo = to + (to > from ? -1 : 1);
+        if (pieces[rookFrom])
+            motions.push_back({rookFrom, rookTo, pieces[rookFrom]->position, .28f});
+    }
+    const auto displacement = squarePosition(to) - squarePosition(from);
+    animationDuration = std::clamp(.32f + .055f * std::sqrt(dot(displacement, displacement)),
+                                 .38f, .65f);
+    animationTime = 0;
+    animationFen = fen;
+}
+
+void Board::update(float dt) {
+    dt = std::max(0.f, dt);
+    const float blend = 1.f - std::exp(-18.f * dt);
+    for (int i = 0; i < 64; ++i) {
+        if (!pieces[i] || std::any_of(motions.begin(), motions.end(),
+            [i](const PieceMotion &motion) { return motion.from == i; })) continue;
+        const float target = squarePosition(i).y + (i == selected ? .45f : 0.f);
+        auto &height = pieces[i]->position.y;
+        height += (target - height) * blend;
+        if (std::abs(target - height) < .0001f) height = target;
+    }
+
+    if (isAnimating()) {
+        animationTime += dt;
+        const float t = std::min(animationTime / animationDuration, 1.f);
+        const float eased = t * t * (3.f - 2.f * t);
+        for (const auto &motion : motions) {
+            auto &piece = pieces[motion.from];
+            piece->position = motion.start * (1.f - eased) + squarePosition(motion.to) * eased;
+            const float arc = 4.f * eased * (1.f - eased);
+            piece->position.y += motion.lift * arc;
+        }
+        if (t >= 1.f) {
+            // Capturas, en passant e promoção só são confirmados ao terminar o trajeto.
+            const auto fen = animationFen;
+            sync(fen);
+        }
+    }
 }
 
 bool Board::isWhite(int s) const {

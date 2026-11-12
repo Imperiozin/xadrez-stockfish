@@ -127,10 +127,11 @@ void Application::drawNotepadInterface(float dt) {
     }
 }
 
-void Application::refresh() {
+void Application::refresh(const std::string &move) {
     cachedFen = game.fen();
     legal = game.movimentosValidos();
-    board->sync(cachedFen);
+    if (move.empty()) board->sync(cachedFen);
+    else board->animateMove(move, cachedFen);
     board->selected = -1;
     board->destinations.clear();
     board->captures.clear();
@@ -152,7 +153,7 @@ int Application::pick(double x, double y) const {
 }
 
 void Application::click(int square) {
-    if (pending.valid() || finished || !promotionPrefix.empty()) {
+    if (pending.valid() || board->isAnimating() || finished || !promotionPrefix.empty()) {
         return;
     }
     if (square < 0) {
@@ -220,7 +221,7 @@ void Application::submit(const std::string &move) {
         }
     }
 
-    board->sync(preview.getFen());
+    board->animateMove(move, preview.getFen());
     board->selected = -1;
     board->destinations.clear();
     board->captures.clear();
@@ -233,13 +234,15 @@ void Application::submit(const std::string &move) {
 }
 
 void Application::update() {
-    if (!pending.valid() ||
+    if (board->isAnimating() || !pending.valid() ||
         pending.wait_for(std::chrono::milliseconds(0)) != std::future_status::ready) {
         return;
     }
+    std::string reply;
     try {
         auto response = pending.get();
         if (response) {
+            reply = response->movimento;
             finished = response->fimPartida;
             resultTitle = response->resultado;
             resultReason = response->motivo;
@@ -250,7 +253,7 @@ void Application::update() {
     } catch (const std::exception &e) {
         status = std::string("Erro do motor: ") + e.what();
     }
-    refresh();
+    refresh(reply);
 }
 
 void Application::reset() {
@@ -413,7 +416,7 @@ void Application::initializeInput() {
 }
 
 int Application::run() {
-    // Inicializacao da janela e do contexto OpenGL.
+    // Inicialização da janela e do contexto OpenGL.
     glfwSetErrorCallback([](int, const char *message) {
         std::cerr << "GLFW: " << message << '\n';
     });
@@ -425,8 +428,18 @@ int Application::run() {
     glfwWindowHint(GLFW_OPENGL_FORWARD_COMPAT, GLFW_TRUE);
 #endif
     glfwWindowHint(GLFW_SAMPLES, 4);
-    window = glfwCreateWindow(width, height, "Xadrez 3D", nullptr, nullptr);
+    glfwWindowHint(GLFW_DECORATED, GLFW_FALSE);
+    glfwWindowHint(GLFW_VISIBLE, GLFW_FALSE);
+    auto *monitor = glfwGetPrimaryMonitor();
+    require(monitor != nullptr, "Não foi possível encontrar o monitor principal");
+    const auto *videoMode = glfwGetVideoMode(monitor);
+    require(videoMode != nullptr, "Não foi possível consultar a resolução do monitor principal");
+    int monitorX, monitorY;
+    glfwGetMonitorPos(monitor, &monitorX, &monitorY);
+    // Janela sem bordas ocupa o monitor, mantendo o modo de vídeo do desktop.
+    window = glfwCreateWindow(videoMode->width, videoMode->height, "Xadrez 3D", nullptr, nullptr);
     require(window != nullptr, "Falha ao criar janela OpenGL 3.3");
+    glfwSetWindowPos(window, monitorX, monitorY);
     glfwMakeContextCurrent(window);
     require(gladLoadGL(reinterpret_cast<GLADloadfunc>(glfwGetProcAddress)) != 0,
             "Falha ao carregar OpenGL");
@@ -458,6 +471,7 @@ int Application::run() {
     // O backend encadeia os callbacks acima e recebe todos os eventos da interface.
     initializeInterface();
     notepad->initializeInterface();
+    glfwShowWindow(window);
 
     // Loop principal: atualiza o jogo, desenha a cena e processa eventos.
     while (!glfwWindowShouldClose(window)) {
@@ -465,6 +479,7 @@ int Application::run() {
         double now = glfwGetTime();
         float dt = float(std::min(now - lastFrame, .05));
         lastFrame = now;
+        board->update(dt);
         update();
         ImGui_ImplOpenGL3_NewFrame();
         ImGui_ImplGlfw_NewFrame();
@@ -486,7 +501,8 @@ void Application::cancelSelection() {
     board->destinations.clear();
     board->captures.clear();
     board->castling.clear();
-    if (!pending.valid() && !finished) status = "Selecione uma peça branca";
+    if (!pending.valid() && !board->isAnimating() && !finished)
+        status = "Selecione uma peça branca";
 }
 
 void Application::constrainCamera() {

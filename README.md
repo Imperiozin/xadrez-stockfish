@@ -7,6 +7,7 @@ A cena reúne tabuleiro, mesa, céu panorâmico, iluminação, sombras e névoa.
 ## Recursos
 
 - Seleção pelo mouse, indicação de destinos legais e destaque de capturas e roques.
+- Movimentos animados para os dois lados, com salto dos cavalos e movimento simultâneo do rei e da torre no roque.
 - Regras validadas pela `chess-library`, incluindo roque, en passant e promoção para rainha, torre, bispo ou cavalo.
 - Detecção de xeque-mate e empates por afogamento, material insuficiente, tripla repetição e regra dos 50 lances.
 - Cinco opções de dificuldade na interface e níveis de −20 a 20 pela linha de comando.
@@ -106,7 +107,9 @@ Abra [XadrezStockfish.cbp](XadrezStockfish.cbp) e escolha o alvo `Windows`, `Lin
 2. Clique em um destino verde para realizar o lance.
 3. Aguarde a resposta do Stockfish e faça sua próxima jogada.
 
-A peça selecionada recebe um contorno dourado. Capturas legais são marcadas com um anel vermelho, inclusive no en passant; o destino do roque tem uma borda verde tracejada. Na promoção, clique em uma das quatro prévias de peças.
+A peça selecionada se eleva suavemente e recebe um contorno dourado. Ao cancelar ou trocar a seleção, ela desce até o tabuleiro. Capturas legais são marcadas com um anel vermelho, inclusive no en passant; o destino do roque tem uma borda verde tracejada. Na promoção, clique em uma das quatro prévias de peças.
+
+Os lances do jogador e do Stockfish são animados em sequência. Aguarde a peça chegar ao destino antes de selecionar a próxima; a câmera continua disponível durante o movimento. Capturas e promoções são concluídas ao final da animação.
 
 | Ação | Controle |
 | --- | --- |

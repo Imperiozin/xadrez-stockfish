@@ -59,7 +59,7 @@ void Application::updateMouseCursor() {
         selectable = !finished && !pending.valid() && promotionChoice(mouseX, mouseY) >= 0;
     } else if (notepad && (notepad->capturesPointer() || notepadHit(mouseX, mouseY).body)) {
         selectable = notepad->wantsPointerCursor();
-    } else if (!finished && !pending.valid()) {
+    } else if (!finished && !pending.valid() && !board->isAnimating()) {
         const int square = pick(mouseX, mouseY);
         selectable = board->isWhite(square) ||
             std::find(board->destinations.begin(), board->destinations.end(), square) !=
@@ -110,7 +110,7 @@ void Application::drawInterface() {
     ImGui::PopTextWrapPos();
     ImGui::End();
 
-    if (!finished) return;
+    if (!finished || board->isAnimating()) return;
 
     ImGui::SetNextWindowPos(ImVec2(io.DisplaySize.x * .5f, io.DisplaySize.y * .5f),
                             ImGuiCond_Always, ImVec2(.5f, .5f));
