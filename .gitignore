@@ -7,3 +7,10 @@ __pycache__/
 *.layout
 *.depend
 
+# Testes locais e scripts de verificação.
+tests/
+test/
+test_*
+*_test.*
+*_tests.*
+
