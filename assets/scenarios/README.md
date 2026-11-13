@@ -1,16 +1,17 @@
 # Cenários e iluminação
 
 O jogo escolhe o cenário pela dificuldade e troca o ambiente ao selecionar outra
-opção no bloco sobre a mesa. A troca preserva a partida e reinicia a animação.
+opção no bloco sobre a mesa. A troca preserva a partida e o andamento da animação
+do pet; apenas a animação do ambiente recomeça.
 O nível padrão continua sendo Intermediário (`--skill 0`).
 
-| Arquivo | Skybox | Dificuldade | Iluminação |
-| --- | --- | --- | --- |
-| `1.cfg` | `assets/skybox/1` — arco-íris | Iniciante, −20 | Dia claro, luz quente, ambiente azulado. |
-| `2.cfg` | `assets/skybox/2` — jardim zen | Fácil, −10 | Luz difusa neutra com leve tom verde. |
-| `3.cfg` | `assets/skybox/3` — pôr do sol | Intermediário, 0 | Luz baixa e alaranjada. |
-| `4.cfg` | `assets/skybox/4` — planeta com dois sóis | Difícil, 10 | Sol normal e sol vermelho menor, móveis, com eclipses. |
-| `5.cfg` | `assets/skybox/5` — bosque assombrado | Impossível, 20 | Pouca luz azulada, névoa e relâmpagos. |
+| Arquivo | Skybox | Dificuldade | Pet | Iluminação |
+| --- | --- | --- | --- | --- |
+| `1.cfg` | `assets/skybox/1` — arco-íris | Iniciante, −20 | Abelha | Dia claro, luz quente, ambiente azulado. |
+| `2.cfg` | `assets/skybox/2` — jardim zen | Fácil, −10 | Panda | Luz difusa neutra com leve tom verde. |
+| `3.cfg` | `assets/skybox/3` — pôr do sol | Intermediário, 0 | Raposa | Luz baixa e alaranjada. |
+| `4.cfg` | `assets/skybox/4` — planeta com dois sóis | Difícil, 10 | Vaca | Sol normal e sol vermelho menor, móveis, com eclipses. |
+| `5.cfg` | `assets/skybox/5` — bosque assombrado | Impossível, 20 | Gato | Pouca luz azulada, névoa e relâmpagos. |
 
 Níveis intermediários da linha de comando usam a opção mais próxima; os pontos
 médios (−15, −5, 5, 15) pertencem à opção superior. As faces mantêm os nomes
@@ -38,12 +39,19 @@ personalizado também herda o global e pode sobrescrever seus valores.
 | Parâmetro | Função |
 | --- | --- |
 | `skybox` | Pasta com as seis faces PNG. |
+| `pet` | Identificador de um dos 24 modelos Kenney em `include/PetCatalog.h`. Cenários 1–5: `Bee`, `Panda`, `Fox`, `Cow`, `Cat`. Padrão: `Fox`. |
 | `animation` | `static`, `binary` ou `storm`. |
 | `lightPosition` | Posição XYZ da luz principal, voltada para o centro da cena. |
 | `lightColor`, `lightIntensity` | Cor RGB e intensidade direta, independente da distância. |
 | `ambientColor`, `ambientStrength` | Cor e intensidade nas áreas de sombra. |
 | `skyBrightness` | Multiplicador do brilho da skybox. |
 | `fogColor`, `fogDensity` | Cor e densidade da névoa; densidade zero a desativa. |
+
+Os pets usam os modelos FBX e animações do pacote Cube Pets, por
+[Kenney](https://kenney.nl), sob licença CC0. Para usar outro animal, altere `pet`
+para um dos identificadores: `Beaver`, `Bee`, `Bunny`, `Cat`, `Caterpillar`,
+`Chick`, `Cow`, `Crab`, `Deer`, `Dog`, `Elephant`, `Fish`, `Fox`, `Giraffe`,
+`Hog`, `Koala`, `Lion`, `Monkey`, `Panda`, `Parrot`, `Penguin`, `Pig`, `Polar`, `Tiger`.
 
 ### Dois sóis — `4.cfg`
 

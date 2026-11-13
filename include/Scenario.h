@@ -6,7 +6,7 @@
 struct Scenario {
     enum class Animation { Static, BinarySuns, Storm };
     std::string skybox;
-    std::string pet = "Deer";
+    std::string pet = "Fox";
     Vec3 lightPosition{}, lightColor{}, ambientColor{}, fogColor{};
     float lightIntensity = 1, ambientStrength = .42f, diffuseStrength = .65f;
     float specularStrength = .32f, woodSpecularStrength = .10f, shininess = 48;

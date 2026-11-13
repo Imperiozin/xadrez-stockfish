@@ -47,24 +47,30 @@ void atualizarResultado(const chess::Board &board, RespostaMovimento &response) 
     }
     switch (result.first) {
     case chess::GameResultReason::CHECKMATE:
+        response.desfecho = board.sideToMove() == chess::Color::WHITE
+                                ? ResultadoPartida::Derrota : ResultadoPartida::Vitoria;
         response.resultado = "Xeque-mate.";
         response.motivo = board.sideToMove() == chess::Color::WHITE
                                  ? "Stockfish venceu."
                                  : "Você venceu.";
         break;
     case chess::GameResultReason::STALEMATE:
+        response.desfecho = ResultadoPartida::Empate;
         response.resultado = "Empate";
         response.motivo = "Afogamento: não há lances legais e o rei não está em xeque.";
         break;
     case chess::GameResultReason::INSUFFICIENT_MATERIAL:
+        response.desfecho = ResultadoPartida::Empate;
         response.resultado = "Empate";
         response.motivo = "Material insuficiente para dar xeque-mate.";
         break;
     case chess::GameResultReason::THREEFOLD_REPETITION:
+        response.desfecho = ResultadoPartida::Empate;
         response.resultado = "Empate";
         response.motivo = "Tripla repetição: a mesma posição ocorreu três vezes.";
         break;
     case chess::GameResultReason::FIFTY_MOVE_RULE:
+        response.desfecho = ResultadoPartida::Empate;
         response.resultado = "Empate";
         response.motivo = "Regra dos 50 lances: 50 lances de cada lado sem captura ou movimento de peão.";
         break;

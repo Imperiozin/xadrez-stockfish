@@ -1,4 +1,5 @@
 #include "Scenario.h"
+#include "PetCatalog.h"
 #include "stockfish.hpp"
 #include <fstream>
 #include <sstream>
@@ -31,7 +32,7 @@ Scenario Scenario::load(const std::string &file) {
     Scenario scene;
     auto read = [&](const arquivos::path &path) {
         std::ifstream input(path.string());
-        if (!input) throw std::runtime_error("Nao foi possivel abrir configuracao: " + path.string());
+        if (!input) throw std::runtime_error("Não foi possível abrir configuração: " + path.string());
         std::string line;
         int number = 0;
         while (std::getline(input, line)) {
@@ -79,22 +80,22 @@ Scenario Scenario::load(const std::string &file) {
                 if (mode == "static") scene.animation = Animation::Static;
                 else if (mode == "binary") scene.animation = Animation::BinarySuns;
                 else if (mode == "storm") scene.animation = Animation::Storm;
-                else throw std::runtime_error("Animacao desconhecida em " + path.string() + ":" + std::to_string(number));
+                else throw std::runtime_error("Animação desconhecida em " + path.string() + ":" + std::to_string(number));
             }
-            else throw std::runtime_error("Parametro desconhecido em " + path.string() + ":" +
+            else throw std::runtime_error("Parâmetro desconhecido em " + path.string() + ":" +
                                           std::to_string(number) + ": " + key);
             std::string extra;
             if (!values || (values >> extra))
-                throw std::runtime_error("Valor invalido em " + path.string() + ":" + std::to_string(number));
+                throw std::runtime_error("Valor inválido em " + path.string() + ":" + std::to_string(number));
         }
     };
     // Shared defaults always come first, independent of where the scenario lives.
     read(pastaDoExecutavel() / "assets/scenarios/global.cfg");
     const auto path = pastaDoExecutavel() / file;
     read(path);
-    if ((scene.pet != "Penguin" && scene.pet != "Panda" && scene.pet != "Deer" &&
-         scene.pet != "Alien" && scene.pet != "Ghost") ||
-        scene.skybox.empty() || scene.shadowNear <= 0 || scene.shadowFar <= scene.shadowNear ||
+    if (!findPet(scene.pet))
+        throw std::runtime_error("Pet desconhecido na configuração: " + scene.pet + " em " + path.string());
+    if (scene.skybox.empty() || scene.shadowNear <= 0 || scene.shadowFar <= scene.shadowNear ||
         scene.shadowFov <= 0 || scene.shadowFov >= 179 || scene.lightIntensity < 0 ||
         scene.ambientStrength < 0 || scene.diffuseStrength < 0 || scene.specularStrength < 0 ||
         scene.woodSpecularStrength < 0 || scene.shininess <= 0 || scene.fogDensity < 0 ||
@@ -107,13 +108,13 @@ Scenario Scenario::load(const std::string &file) {
         scene.lightningJitter >= scene.lightningInterval - 1 ||
         dot(scene.lightPosition, scene.lightPosition) < .001f ||
         scene.lightPosition.x * scene.lightPosition.x + scene.lightPosition.z * scene.lightPosition.z < .001f)
-        throw std::runtime_error("Configuracao de cenario invalida: " + path.string());
+        throw std::runtime_error("Configuração de cenário inválida: " + path.string());
     scene.lightViewProjection();
     if (scene.animation == Animation::BinarySuns) {
         if (scene.secondaryLightPosition.x * scene.secondaryLightPosition.x +
             scene.secondaryLightPosition.z * scene.secondaryLightPosition.z < .001f ||
             (scene.shadowAutoFit && scene.shadowRadius >= 59.9f))
-            throw std::runtime_error("Volume de sombras ou segunda luz invalido: " + path.string());
+            throw std::runtime_error("Volume de sombras ou segunda luz inválido: " + path.string());
         scene.lightViewProjection(true);
     }
     return scene;

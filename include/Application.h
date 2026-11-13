@@ -30,6 +30,7 @@ class Application {
     std::unique_ptr<Table> table;
     std::unique_ptr<Pet> pet;
     AvaliacaoJogada lastReview;
+    ResultadoPartida lastOutcome = ResultadoPartida::EmAndamento;
     std::unique_ptr<Pet> makePet(const Scenario &scene);
     Notepad *notepad = nullptr; // A mesa possui o objeto; este ponteiro apenas encaminha eventos.
     std::future<std::unique_ptr<RespostaMovimento>> pending;

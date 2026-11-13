@@ -1,47 +1,44 @@
 #include "Pet.h"
+// Pets, textura e animações: Cube Pets, por Kenney — https://kenney.nl (CC0).
 #include "AnimatedModel.h"
+#include "PetCatalog.h"
+#include "Table.h"
 #include "stockfish.hpp"
-#include "imgui.h"
-#include "imgui_impl_opengl3.h"
+#include "jogo.hpp"
 #include "../../vendor/stb_image.h"
-#include <iomanip>
-#include <sstream>
 #include <stdexcept>
 
 namespace {
-const char *displayName(const std::string &name) {
-    if (name == "Penguin") return "Pinguim";
-    if (name == "Deer") return "Cervo";
-    if (name == "Ghost") return "Fantasma";
-    return name == "Panda" ? "Panda" : "Alien";
+const PetDefinition &definition(const std::string &name) {
+    const auto *pet = findPet(name);
+    if (!pet) throw std::runtime_error("Pet desconhecido: " + name);
+    return *pet;
 }
-constexpr int labelWidth = 512, labelHeight = 160;
-std::vector<Vertex> plaque() {
-    return {{{-1.9f, .015f, 1.35f}, {0,1,0}, {0,1}},
-            {{-1.9f, .015f, 2.65f}, {0,1,0}, {0,0}},
-            {{ 1.9f, .015f, 2.65f}, {0,1,0}, {1,0}},
-            {{-1.9f, .015f, 1.35f}, {0,1,0}, {0,1}},
-            {{ 1.9f, .015f, 2.65f}, {0,1,0}, {1,0}},
-            {{ 1.9f, .015f, 1.35f}, {0,1,0}, {1,1}}};
-}
+constexpr float pi = 3.14159265358979323846f;
+constexpr float laneX = -7.5f, laneEnd = 5.f, boardAngle = pi / 2;
+constexpr double walkSpeed = 1.2, pauseDuration = 3;
+constexpr double walkLeg = laneEnd / walkSpeed;
+constexpr double segmentDuration = pauseDuration + walkLeg;
+constexpr double tourDuration = 4 * segmentDuration;
+constexpr float stops[] = {0, -laneEnd, 0, laneEnd, 0};
 }
 
 struct Pet::Impl {
-    std::string name, title = "Faça sua jogada", detail = "Seu companheiro de partida";
-    ImU32 titleColor = IM_COL32(35, 80, 94, 255);
     AnimatedModel model;
-    Mesh body, base{Mesh::cube()}, label{plaque()};
-    GLuint texture = 0, labelTexture = 0, framebuffer = 0;
-    std::string clip = "Idle";
-    std::string nextClip;
-    double time = 0, remaining = 0;
+    Mesh body;
+    GLuint texture = 0;
+    std::string clip = "idle";
+    std::string tourClip = "idle";
+    double time = 0, remaining = 0, tourTime = 0;
+    double tourClipTime = 0;
+    bool stopped = false;
     float transition = 1;
-    std::vector<Vertex> previous;
-    bool labelDirty = true;
+    std::vector<Vertex> previous, pose;
 
-    explicit Impl(const std::string &id) : name(displayName(id)),
-        model((pastaDoExecutavel() / ("assets/objects/pets/" + id + ".gltf")).string()),
+    explicit Impl(const std::string &id) :
+        model((pastaDoExecutavel() / petModelPath(definition(id))).string(), 2.2f),
         body(model.vertices()) {
+        pose = model.vertices();
         int width, height, channels;
         const auto &png = model.texturePng();
         stbi_set_flip_vertically_on_load(false);
@@ -56,55 +53,74 @@ struct Pet::Impl {
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
         glGenerateMipmap(GL_TEXTURE_2D);
-        glGenTextures(1, &labelTexture);
-        glBindTexture(GL_TEXTURE_2D, labelTexture);
-        glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA8, labelWidth, labelHeight, 0, GL_RGBA, GL_UNSIGNED_BYTE, nullptr);
-        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
-        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
-        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
-        GLint old;
-        glGetIntegerv(GL_FRAMEBUFFER_BINDING, &old);
-        glGenFramebuffers(1, &framebuffer);
-        glBindFramebuffer(GL_FRAMEBUFFER, framebuffer);
-        glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, labelTexture, 0);
-        const bool complete = glCheckFramebufferStatus(GL_FRAMEBUFFER) == GL_FRAMEBUFFER_COMPLETE;
-        glBindFramebuffer(GL_FRAMEBUFFER, old);
-        if (!complete) {
-            glDeleteFramebuffers(1, &framebuffer);
-            glDeleteTextures(1, &labelTexture);
-            glDeleteTextures(1, &texture);
-            throw std::runtime_error("Falha ao criar placa do pet");
-        }
     }
-    ~Impl() {
-        glDeleteFramebuffers(1, &framebuffer);
-        glDeleteTextures(1, &labelTexture);
-        glDeleteTextures(1, &texture);
-    }
+    ~Impl() { glDeleteTextures(1, &texture); }
     void play(const std::string &next, double hold) {
-        previous = model.vertices();
+        previous = pose;
         clip = next;
-        nextClip.clear();
         time = 0;
         remaining = hold;
         transition = 0;
     }
 };
 
-Pet::Pet(const std::string &name) : impl(std::make_unique<Impl>(name)) {}
+Pet::Pet(const std::string &name, const Pet *previous) : impl(std::make_unique<Impl>(name)) {
+    position = {laneX, Table::surfaceY, 0};
+    angle = boardAngle;
+    if (previous) {
+        // Troca apenas o modelo; os relógios e a reação em curso continuam.
+        const auto &source = *previous->impl;
+        auto &m = *impl;
+        position = previous->position;
+        scale = previous->scale;
+        rotation = previous->rotation;
+        angle = previous->angle;
+        m.clip = source.clip;
+        m.time = source.time;
+        m.remaining = source.remaining;
+        m.tourTime = source.tourTime;
+        m.tourClip = source.tourClip;
+        m.tourClipTime = source.tourClipTime;
+        m.stopped = source.stopped;
+        m.model.sample(m.clip, m.time);
+        m.pose = m.model.vertices();
+        m.body.update(m.pose);
+    }
+}
 Pet::~Pet() = default;
 
 void Pet::update(float dt) {
     auto &m = *impl;
     dt = std::max(0.f, dt);
-    m.time += dt;
-    if (m.clip != "Idle") {
-        m.remaining -= dt;
-        if (m.remaining <= 0) {
-            const auto next = m.nextClip;
-            m.play(next.empty() ? "Idle" : next, next.empty() ? 0 : 1.5);
+    float freeTime = dt;
+    if (m.remaining > 0) {
+        freeTime = float(std::max(0.0, double(dt) - m.remaining));
+        m.remaining = std::max(0.0, m.remaining - dt);
+        if (m.remaining == 0) m.play("idle", 0);
+    }
+    float heading = boardAngle;
+    const bool touring = m.remaining == 0 && !m.stopped;
+    if (touring) {
+        m.tourTime = std::fmod(m.tourTime + freeTime, tourDuration);
+        const int segment = int(m.tourTime / segmentDuration);
+        const double phase = std::fmod(m.tourTime, segmentDuration);
+        const char *clip = "idle";
+        position.z = stops[segment];
+        if (phase >= pauseDuration) {
+            const float direction = stops[segment + 1] > stops[segment] ? 1.f : -1.f;
+            position.z += direction * float((phase - pauseDuration) * walkSpeed);
+            heading = direction > 0 ? 0 : pi;
+            clip = "walk";
         }
+        if (m.clip != clip) m.play(clip, 0);
+    }
+    // O passeio fica na lateral livre; nas pausas e reações, olha o tabuleiro.
+    const float turn = std::remainder(heading - angle, 2 * pi);
+    angle += std::clamp(turn, -dt * 6.f, dt * 6.f);
+    m.time += dt;
+    if (touring) {
+        m.tourClip = m.clip;
+        m.tourClipTime = m.time;
     }
     m.model.sample(m.clip, m.time);
     m.transition = std::min(1.f, m.transition + dt / .16f);
@@ -117,97 +133,52 @@ void Pet::update(float dt) {
         }
     }
     m.body.update(vertices);
+    m.pose = std::move(vertices);
 }
 
 void Pet::review(const AvaliacaoJogada &evaluation) {
     auto &m = *impl;
-    m.title = nomeQualidade(evaluation.qualidade);
-    m.detail = "Sua jogada: " + evaluation.movimento;
-    if (evaluation.posicao.valida) {
-        std::ostringstream score;
-        if (evaluation.posicao.mate) score << " | Mate " << evaluation.posicao.valor;
-        else score << " | " << std::showpos << std::fixed << std::setprecision(2)
-                   << evaluation.posicao.valor / 100.0;
-        m.detail += score.str();
+    const auto &score = evaluation.posicao;
+    // O Stockfish fornece centésimos de peão; mate usa uma distância com sinal.
+    if (!score.valida || score.valor == 0 ||
+        (!score.mate && score.valor > -100 && score.valor < 100)) {
+        reset();
+        return;
     }
-    m.titleColor = IM_COL32(35, 80, 94, 255);
-    switch (evaluation.qualidade) {
-    case QualidadeJogada::Melhor: m.play("Dance", 2.5); break;
-    case QualidadeJogada::Excelente: m.play("Jump", 1.6); break;
-    case QualidadeJogada::Boa: m.play("Yes", 1.5); break;
-    case QualidadeJogada::Imprecisao:
-        m.titleColor = IM_COL32(151, 105, 22, 255);
-        m.play("No", 1.5); break;
-    case QualidadeJogada::Erro:
-        m.titleColor = IM_COL32(170, 71, 29, 255);
-        m.play("HitRecieve", 1.5); break;
-    case QualidadeJogada::ErroGrave:
-        m.titleColor = IM_COL32(162, 37, 42, 255);
-        m.play("No", 1.0);
-        m.nextClip = "HitRecieve";
-        break;
-    default: m.play("Idle", 0); break;
-    }
-    m.labelDirty = true;
+    m.stopped = false;
+    m.play(score.valor > 0 ? "gesture-positive" : "gesture-negative", 1.5);
 }
 void Pet::thinking() {
-    impl->title = "Analisando sua jogada...";
-    impl->detail = "Observe a reação após o lance";
-    impl->titleColor = IM_COL32(35, 80, 94, 255);
-    impl->labelDirty = true;
+    impl->stopped = true;
+    impl->play("idle", 0);
+}
+void Pet::finish(ResultadoPartida result) {
+    auto &m = *impl;
+    switch (result) {
+    case ResultadoPartida::Vitoria: m.play("dance", 0); break;
+    case ResultadoPartida::Derrota: m.play("gesture-negative", 2); break;
+    case ResultadoPartida::Empate: m.play("gesture-positive", 2); break;
+    case ResultadoPartida::EmAndamento: return;
+    }
+    m.stopped = true;
 }
 void Pet::reset() {
-    impl->title = "Faça sua jogada";
-    impl->detail = "Seu companheiro de partida";
-    impl->titleColor = IM_COL32(35, 80, 94, 255);
-    impl->play("Idle", 0);
-    impl->labelDirty = true;
-}
-
-void Pet::renderLabel() {
-    auto &m = *impl;
-    if (!m.labelDirty) return;
-    auto &io = ImGui::GetIO();
-    ImDrawList draw(ImGui::GetDrawListSharedData());
-    draw.PushTextureID(io.Fonts->TexID);
-    draw.PushClipRect({0,0}, {float(labelWidth),float(labelHeight)});
-    draw.AddRectFilled({0,0}, {float(labelWidth),float(labelHeight)}, IM_COL32(245,236,210,255));
-    auto text = [&](float y, float size, const std::string &value, ImU32 color) {
-        draw.AddText(io.Fonts->Fonts[0], size, {22,y}, color, value.c_str());
-    };
-    text(14, 26, m.name, IM_COL32(75,68,54,255));
-    text(53, 32, m.title, m.titleColor);
-    text(111, 23, m.detail, IM_COL32(75,68,54,255));
-    draw.PopClipRect();
-    draw.PopTextureID();
-    ImDrawData data;
-    data.Valid = true;
-    data.DisplaySize = {float(labelWidth),float(labelHeight)};
-    data.FramebufferScale = {1,1};
-    data.AddDrawList(&draw);
-    GLint oldFramebuffer, viewport[4];
-    glGetIntegerv(GL_FRAMEBUFFER_BINDING, &oldFramebuffer);
-    glGetIntegerv(GL_VIEWPORT, viewport);
-    glBindFramebuffer(GL_FRAMEBUFFER, m.framebuffer);
-    glViewport(0,0,labelWidth,labelHeight);
-    ImGui_ImplOpenGL3_RenderDrawData(&data);
-    glBindFramebuffer(GL_FRAMEBUFFER, oldFramebuffer);
-    glViewport(viewport[0],viewport[1],viewport[2],viewport[3]);
-    glBindTexture(GL_TEXTURE_2D, m.labelTexture);
-    glGenerateMipmap(GL_TEXTURE_2D);
-    glBindTexture(GL_TEXTURE_2D, 0);
-    m.labelDirty = false;
+    const bool interrupted = impl->stopped || impl->remaining > 0;
+    impl->stopped = false;
+    if (!interrupted) return;
+    // Encerra a reação e retoma o quadro do passeio anterior à interrupção.
+    impl->play(impl->tourClip, 0);
+    impl->time = impl->tourClipTime;
+    impl->model.sample(impl->tourClip, impl->tourClipTime);
+    impl->pose = impl->model.vertices();
+    impl->previous.clear();
+    impl->transition = 1;
+    impl->body.update(impl->pose);
 }
 
 void Pet::draw(Shader &shader, const Mat4 &parent) {
     const auto matrix = model(parent);
-    // A base separates the pet from the board and holds the physical review plaque.
-    shader.object(matrix * transform({0,-.10f,.8f}, {4.1f,.20f,4.1f}), {.28f,.16f,.08f}, true);
-    impl->base.draw();
     shader.object(matrix, {1,1,1});
     shader.modelTexture(impl->texture);
     impl->body.draw();
-    shader.object(matrix, {1,1,1});
-    shader.modelTexture(impl->labelTexture);
-    impl->label.draw();
 }

@@ -253,7 +253,9 @@ void Application::update() {
             resultTitle = response->resultado;
             resultReason = response->motivo;
             lastReview = response->avaliacao;
+            lastOutcome = response->desfecho;
             pet->review(lastReview);
+            pet->finish(lastOutcome);
             status = finished ? response->resultado : "Sua vez | Stockfish: " + response->movimento;
         } else {
             status = "Lance inválido. Tente novamente.";
@@ -272,6 +274,7 @@ void Application::reset() {
     }
     game.reiniciar();
     lastReview = {};
+    lastOutcome = ResultadoPartida::EmAndamento;
     pet->reset();
     finished = false;
     resultTitle.clear();
@@ -524,7 +527,6 @@ int Application::run() {
         drawInterface();
         updateMouseCursor();
         ImGui::Render();
-        pet->renderLabel();
         render();
         glfwSwapBuffers(window);
     }
@@ -651,8 +653,5 @@ void Application::drawScene(Shader &sceneShader) {
 }
 
 std::unique_ptr<Pet> Application::makePet(const Scenario &scene) {
-    auto companion = std::make_unique<Pet>(scene.pet);
-    companion->position = {-7.3f, Table::surfaceY + .20f, 2.0f};
-    if (!lastReview.movimento.empty()) companion->review(lastReview);
-    return companion;
+    return std::make_unique<Pet>(scene.pet, pet.get());
 }

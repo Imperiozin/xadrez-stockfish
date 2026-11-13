@@ -8,9 +8,12 @@
 #include <string>
 #include <vector>
 
+enum class ResultadoPartida { EmAndamento, Vitoria, Derrota, Empate };
+
 struct RespostaMovimento {
     std::string movimento; // Resposta UCI do Stockfish, por exemplo "e7e5".
     bool fimPartida = false;
+    ResultadoPartida desfecho = ResultadoPartida::EmAndamento;
     std::string resultado; // Vazio enquanto a partida continua.
     std::string motivo; // Causa exata do término da partida.
     AvaliacaoJogada avaliacao; // Review of the human move, not the engine reply.

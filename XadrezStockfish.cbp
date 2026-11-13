@@ -54,6 +54,42 @@
         <Unit filename="src/graphics/ApplicationUI.cpp">
             <Option compilerVar="CPP" />
         </Unit>
+        <Unit filename="src/graphics/AnimatedModel.cpp">
+            <Option compilerVar="CPP" />
+        </Unit>
+        <Unit filename="src/graphics/Pet.cpp">
+            <Option compilerVar="CPP" />
+        </Unit>
+        <Unit filename="include/AnimatedModel.h" />
+        <Unit filename="include/Pet.h" />
+        <Unit filename="include/PetCatalog.h" />
+        <Unit filename="assets/objects/pets/animal-beaver.fbx" />
+        <Unit filename="assets/objects/pets/animal-bee.fbx" />
+        <Unit filename="assets/objects/pets/animal-bunny.fbx" />
+        <Unit filename="assets/objects/pets/animal-cat.fbx" />
+        <Unit filename="assets/objects/pets/animal-caterpillar.fbx" />
+        <Unit filename="assets/objects/pets/animal-chick.fbx" />
+        <Unit filename="assets/objects/pets/animal-cow.fbx" />
+        <Unit filename="assets/objects/pets/animal-crab.fbx" />
+        <Unit filename="assets/objects/pets/animal-deer.fbx" />
+        <Unit filename="assets/objects/pets/animal-dog.fbx" />
+        <Unit filename="assets/objects/pets/animal-elephant.fbx" />
+        <Unit filename="assets/objects/pets/animal-fish.fbx" />
+        <Unit filename="assets/objects/pets/animal-fox.fbx" />
+        <Unit filename="assets/objects/pets/animal-giraffe.fbx" />
+        <Unit filename="assets/objects/pets/animal-hog.fbx" />
+        <Unit filename="assets/objects/pets/animal-koala.fbx" />
+        <Unit filename="assets/objects/pets/animal-lion.fbx" />
+        <Unit filename="assets/objects/pets/animal-monkey.fbx" />
+        <Unit filename="assets/objects/pets/animal-panda.fbx" />
+        <Unit filename="assets/objects/pets/animal-parrot.fbx" />
+        <Unit filename="assets/objects/pets/animal-penguin.fbx" />
+        <Unit filename="assets/objects/pets/animal-pig.fbx" />
+        <Unit filename="assets/objects/pets/animal-polar.fbx" />
+        <Unit filename="assets/objects/pets/animal-tiger.fbx" />
+        <Unit filename="assets/objects/pets/License.txt" />
+        <Unit filename="assets/objects/pets/Textures/colormap.png" />
+        <Unit filename="src/avaliacao.hpp" />
         <Unit filename="src/graphics/Board.cpp">
             <Option compilerVar="CPP" />
         </Unit>

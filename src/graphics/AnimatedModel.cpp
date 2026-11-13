@@ -4,6 +4,9 @@
 #include <assimp/scene.h>
 #include <assimp/material.h>
 #include <limits>
+#include <fstream>
+#include <iterator>
+#include "stockfish.hpp"
 #include <stdexcept>
 #include <unordered_map>
 
@@ -38,6 +41,7 @@ struct AnimatedModel::Impl {
     aiMatrix4x4 inverseRoot;
     Vec3 origin{};
     float scale = 1;
+    bool grounded = false;
 
     void addNode(const aiNode *source, int parent) {
         const int index = int(nodes.size());
@@ -84,7 +88,7 @@ struct AnimatedModel::Impl {
             for (unsigned b = 0; b < mesh.mNumBones; ++b) {
                 const auto &bone = *mesh.mBones[b];
                 const auto found = nodeIds.find(bone.mName.C_Str());
-                if (found == nodeIds.end()) throw std::runtime_error("Osso do pet sem no correspondente");
+                if (found == nodeIds.end()) throw std::runtime_error("Osso do pet sem nó correspondente");
                 const auto matrix = inverseRoot * nodes[found->second].global * bone.mOffsetMatrix;
                 auto normalMatrix = aiMatrix3x3(matrix);
                 normalMatrix.Inverse().Transpose();
@@ -117,13 +121,21 @@ struct AnimatedModel::Impl {
                 }
             }
         }
+        // Impede que rotações dos gestos atravessem o tampo; preserva os saltos.
+        if (grounded && !output.empty()) {
+            float lowest = 0;
+            for (const auto &vertex : output) lowest = std::min(lowest, vertex.position.y);
+            for (auto &vertex : output) vertex.position.y -= lowest;
+        }
     }
 };
 
 AnimatedModel::AnimatedModel(const std::string &path, float height) : impl(std::make_unique<Impl>()) {
     auto &m = *impl;
+    // A paleta Cube Pets, por Kenney (https://kenney.nl, CC0), é carregada sem
+    // inversão no stb_image; ajusta V para a orientação da imagem em memória.
     m.scene = m.importer.ReadFile(path, aiProcess_Triangulate | aiProcess_GenSmoothNormals |
-        aiProcess_ValidateDataStructure);
+        aiProcess_ValidateDataStructure | aiProcess_FlipUVs);
     if (!m.scene || !m.scene->mRootNode || !m.scene->HasMeshes() || !m.scene->HasAnimations())
         throw std::runtime_error("Falha ao importar pet " + path + ": " + m.importer.GetErrorString());
     m.inverseRoot = m.scene->mRootNode->mTransformation;
@@ -133,18 +145,30 @@ AnimatedModel::AnimatedModel(const std::string &path, float height) : impl(std::
         const auto *a = m.scene->mAnimations[i];
         if (a->mDuration > 0) m.clips.emplace(a->mName.C_Str(), a);
     }
-    for (const auto *name : {"Idle", "Yes", "No", "Jump", "Dance", "HitRecieve"})
-        if (!m.clips.count(name)) throw std::runtime_error("Animacao ausente no pet: " + std::string(name));
-    // The selected pets use a single embedded PNG palette shared by their meshes.
+    for (const auto *name : {"static", "idle", "walk", "run", "eat", "dance",
+                             "gesture-positive", "gesture-negative"})
+        if (!m.clips.count(name)) throw std::runtime_error("Animação ausente no pet: " + std::string(name));
+    // Os FBX compartilham uma paleta PNG externa; glTF pode incorporá-la.
     aiString texture;
     const auto *material = m.scene->mMaterials[m.parts.front().source->mMaterialIndex];
     if (material->GetTexture(aiTextureType_BASE_COLOR, 0, &texture) != AI_SUCCESS)
         material->GetTexture(aiTextureType_DIFFUSE, 0, &texture);
     const auto *embedded = m.scene->GetEmbeddedTexture(texture.C_Str());
-    if (!embedded || embedded->mHeight != 0) throw std::runtime_error("Pet sem textura PNG incorporada: " + path);
-    const auto *bytes = reinterpret_cast<const unsigned char *>(embedded->pcData);
-    m.png.assign(bytes, bytes + embedded->mWidth);
-    m.sample(m.clips.at("Idle"), 0);
+    if (embedded && embedded->mHeight == 0) {
+        const auto *bytes = reinterpret_cast<const unsigned char *>(embedded->pcData);
+        m.png.assign(bytes, bytes + embedded->mWidth);
+    } else {
+        std::string relative = texture.C_Str();
+        std::replace(relative.begin(), relative.end(), '\\', '/');
+        const auto folder = arquivos::path(path).parent_path();
+        auto image = folder / relative;
+        if (!arquivos::is_regular_file(image))
+            image = folder / "Textures" / arquivos::path(relative).filename();
+        std::ifstream input(image.string(), std::ios::binary);
+        if (!input) throw std::runtime_error("Falha ao abrir textura do pet: " + image.string());
+        m.png.assign(std::istreambuf_iterator<char>(input), std::istreambuf_iterator<char>());
+    }
+    m.sample(m.clips.at("static"), 0);
     const float inf = std::numeric_limits<float>::infinity();
     Vec3 low{inf, inf, inf}, high{-inf, -inf, -inf};
     for (const auto &v : m.output) {
@@ -153,10 +177,11 @@ AnimatedModel::AnimatedModel(const std::string &path, float height) : impl(std::
         high = {std::max(high.x, p.x), std::max(high.y, p.y), std::max(high.z, p.z)};
     }
     if (!(height > 0) || !std::isfinite(high.y-low.y) || high.y <= low.y)
-        throw std::runtime_error("Pet sem altura valida: " + path);
+        throw std::runtime_error("Pet sem altura válida: " + path);
     m.origin = {(low.x+high.x)*.5f, low.y, (low.z+high.z)*.5f};
     m.scale = height / (high.y-low.y);
-    sample("Idle", 0);
+    m.grounded = true;
+    sample("idle", 0);
 }
 AnimatedModel::~AnimatedModel() = default;
 void AnimatedModel::sample(const std::string &clip, double seconds) {
