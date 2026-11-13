@@ -73,6 +73,8 @@ void Shader::use(const Mat4 &vp, Vec3 eye) {
     // Samplers of different types must use different units even in inactive branches.
     glUniform1i(glGetUniformLocation(id, "secondaryShadowMap"), 2);
     glUniform1i(glGetUniformLocation(id, "pageTexture"), 1);
+    glUniform1i(glGetUniformLocation(id, "pageSurface"), 4);
+    glUniform1i(glGetUniformLocation(id, "modelTexture"), 3);
     glUniformMatrix4fv(glGetUniformLocation(id, "viewProjection"), 1, GL_FALSE, vp.v);
     glUniform3f(glGetUniformLocation(id, "eye"), eye.x, eye.y, eye.z);
 }
@@ -123,12 +125,14 @@ void Shader::object(const Mat4 &m, Vec3 c, bool wood) {
     glUniform3f(glGetUniformLocation(id, "color"), c.x, c.y, c.z);
 }
 
-void Shader::pageTexture(GLuint texture, float height) {
+void Shader::pageTexture(GLuint texture, float height, GLuint surfaceTexture) {
     glUniform1i(glGetUniformLocation(id, "pageTextureEnabled"), GL_TRUE);
     glUniform1f(glGetUniformLocation(id, "pageHeight"), height);
     glUniform1i(glGetUniformLocation(id, "pageTexture"), 1);
     glActiveTexture(GL_TEXTURE1);
     glBindTexture(GL_TEXTURE_2D, texture);
+    glActiveTexture(GL_TEXTURE4);
+    glBindTexture(GL_TEXTURE_2D, surfaceTexture);
     glActiveTexture(GL_TEXTURE0);
 }
 

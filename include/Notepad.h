@@ -17,7 +17,7 @@ class Notepad : public Object {
     PageSurface page;
     Vec3 boundsLow, boundsHigh;
     ImGuiContext *context = nullptr;
-    GLuint framebuffer = 0, texture = 0;
+    GLuint framebuffer = 0, texture = 0, surfaceTexture = 0;
     bool pressed = false, pointerOnPage = false, pointerOnControl = false;
     void load();
 

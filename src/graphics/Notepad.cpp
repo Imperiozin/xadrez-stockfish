@@ -121,6 +121,7 @@ Notepad::~Notepad() {
         ImGui::DestroyContext(context);
     }
     if (texture) glDeleteTextures(1, &texture);
+    if (surfaceTexture) glDeleteTextures(1, &surfaceTexture);
     if (framebuffer) glDeleteFramebuffers(1, &framebuffer);
 }
 
@@ -153,6 +154,42 @@ void Notepad::initializeInterface() {
     GLint oldFramebuffer, oldTexture;
     glGetIntegerv(GL_FRAMEBUFFER_BINDING, &oldFramebuffer);
     glGetIntegerv(GL_TEXTURE_BINDING_2D, &oldTexture);
+    // Rasteriza a maior altura do papel por ponto, incluindo as pontas curvadas.
+    // O mapa usa as mesmas coordenadas locais da tinta e independe da câmera.
+    std::vector<float> surfaceHeights(canvasWidth * canvasHeight, boundsLow.y);
+    const float pixelWidth = (page.bottomRight.x - page.topLeft.x) / canvasWidth;
+    const float pixelHeight = (page.bottomRight.z - page.topLeft.z) / canvasHeight;
+    for (const auto &part : parts) {
+        if (!part.ruled) continue;
+        for (size_t i = 0; i < part.vertices.size(); i += 3) {
+            const auto a = part.vertices[i].position, b = part.vertices[i + 1].position,
+                       c = part.vertices[i + 2].position;
+            const auto normal = cross(b - a, c - a);
+            if (normal.y <= 0) continue;
+            const int left = std::max(0, int(std::floor((std::min({a.x, b.x, c.x}) - page.topLeft.x) / pixelWidth)));
+            const int right = std::min(canvasWidth - 1, int(std::ceil((std::max({a.x, b.x, c.x}) - page.topLeft.x) / pixelWidth)));
+            const int top = std::max(0, int(std::floor((std::min({a.z, b.z, c.z}) - page.topLeft.z) / pixelHeight)));
+            const int bottom = std::min(canvasHeight - 1, int(std::ceil((std::max({a.z, b.z, c.z}) - page.topLeft.z) / pixelHeight)));
+            for (int y = top; y <= bottom; ++y) {
+                for (int x = left; x <= right; ++x) {
+                    const float dx = page.topLeft.x + (x + .5f) * pixelWidth - a.x;
+                    const float dz = page.topLeft.z + (y + .5f) * pixelHeight - a.z;
+                    const float u = ((c.x - a.x) * dz - (c.z - a.z) * dx) / normal.y;
+                    const float v = ((b.z - a.z) * dx - (b.x - a.x) * dz) / normal.y;
+                    if (u < 0 || v < 0 || u + v > 1) continue;
+                    auto &height = surfaceHeights[y * canvasWidth + x];
+                    height = std::max(height, a.y + u * (b.y - a.y) + v * (c.y - a.y));
+                }
+            }
+        }
+    }
+    glGenTextures(1, &surfaceTexture);
+    glBindTexture(GL_TEXTURE_2D, surfaceTexture);
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_R32F, canvasWidth, canvasHeight, 0, GL_RED, GL_FLOAT, surfaceHeights.data());
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
     glGenTextures(1, &texture);
     glBindTexture(GL_TEXTURE_2D, texture);
     glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA8, canvasWidth, canvasHeight, 0, GL_RGBA, GL_UNSIGNED_BYTE, nullptr);
@@ -208,6 +245,22 @@ Notepad::Hit Notepad::hit(const Ray &ray, const Mat4 &parent) const {
                     uv.x >= 0 && uv.x <= 1 && uv.y >= 0 && uv.y <= 1) {
                     result.page = true;
                     result.pixel = {uv.x * canvasWidth, uv.y * canvasHeight};
+                }
+            }
+        }
+    }
+    if (result.page) {
+        const auto point = local.origin + local.direction * result.distance;
+        const Ray fromAbove{{point.x, boundsHigh.y + 1, point.z}, {0, -1, 0}};
+        for (const auto &part : parts) {
+            if (!part.ruled) continue;
+            for (size_t i = 0; i < part.vertices.size(); i += 3) {
+                float distance;
+                if (intersectTriangle(fromAbove, part.vertices[i].position, part.vertices[i + 1].position,
+                                      part.vertices[i + 2].position, distance) &&
+                    fromAbove.origin.y - distance > point.y + .0005f) {
+                    result.page = false;
+                    return result;
                 }
             }
         }
@@ -345,7 +398,7 @@ void Notepad::draw(Shader &shader, const Mat4 &parent) {
         if (part.ruled) {
             shader.ruledPaper(rulingOrigin, rulingScale);
             // Imprime a tinta na própria malha, preservando sua cor, normais e sombras.
-            if (texture) shader.pageTexture(texture, page.topLeft.y);
+            if (texture) shader.pageTexture(texture, page.topLeft.y, surfaceTexture);
         }
         part.mesh->draw();
     }

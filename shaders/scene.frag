@@ -3,6 +3,7 @@
 in vec3 worldPosition;
 uniform bool pageTextureEnabled;
 uniform sampler2D pageTexture;
+uniform sampler2D pageSurface;
 uniform float pageHeight;
 in vec3 localPosition;
 in vec3 localNormal;
@@ -99,9 +100,10 @@ void main() {
     if (pageTextureEnabled) {
         vec2 uv = (localPosition.xz - rulingMapping.xy) * rulingMapping.zw / vec2(textureSize(pageTexture, 0));
         vec4 ink = texture(pageTexture, clamp(vec2(uv.x, 1.0 - uv.y), vec2(0.0), vec2(1.0)));
-        // A UI usa a própria superfície da folha, sem um retângulo sobreposto.
+        // A altura superior em cada ponto impede a tinta nas folhas sob a curva.
+        float surfaceHeight = texture(pageSurface, uv).r;
         if (all(greaterThanEqual(uv, vec2(0.0))) && all(lessThanEqual(uv, vec2(1.0))) &&
-            localPosition.y >= pageHeight - 0.0005 && normalize(localNormal).y > 0.15) {
+            localPosition.y >= max(pageHeight, surfaceHeight) - 0.0005 && normalize(localNormal).y > 0.15) {
             // O framebuffer do ImGui contém cor pré-multiplicada pelo alfa.
             materialColor = materialColor * (1.0 - ink.a) + ink.rgb;
         }
