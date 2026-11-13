@@ -335,13 +335,15 @@ struct Stockfish::Impl {
     }
 
     std::string waitFor(const std::string &prefix, int timeout,
-                        std::vector<std::string> *melhores = nullptr) {
+                        std::vector<std::string> *melhores = nullptr,
+                        AvaliacaoPosicao *avaliacao = nullptr) {
         const auto deadline = Clock::now() + std::chrono::milliseconds(timeout);
         for (;;) {
             auto line = process.readLine(deadline);
             if (trace) {
                 std::cerr << "<< " << line << '\n';
             }
+            if (avaliacao) lerAvaliacaoUci(line, *avaliacao);
             if (melhores && line.rfind("info ", 0) == 0) {
                 const auto multi = line.find(" multipv ");
                 const auto pv = line.find(" pv ");
@@ -420,6 +422,26 @@ std::string Stockfish::responder(const std::vector<std::string> &history,
     const auto line = impl_->waitFor("bestmove", impl_->milliseconds + 20000, melhores);
     const auto end = line.find(' ', 9);
     return line.substr(9, end == std::string::npos ? end : end - 9);
+}
+
+AvaliacaoPosicao Stockfish::analisar(const std::vector<std::string> &history,
+                                    const std::string &somenteMovimento) {
+    impl_->send("setoption name MultiPV value 1");
+    impl_->send("setoption name UCI_ShowWDL value true");
+    impl_->ready();
+    std::string position = "position startpos";
+    if (!history.empty()) position += " moves";
+    for (const auto &move : history) position += " " + move;
+    impl_->send(position);
+    std::string search = "go movetime " + std::to_string(impl_->milliseconds);
+    if (!somenteMovimento.empty()) search += " searchmoves " + somenteMovimento;
+    impl_->send(search);
+    AvaliacaoPosicao result;
+    const auto line = impl_->waitFor("bestmove", impl_->milliseconds + 20000, nullptr, &result);
+    std::istringstream response(line);
+    std::string keyword;
+    response >> keyword >> result.melhorMovimento;
+    return result;
 }
 
 arquivos::path pastaDoExecutavel() {

@@ -47,24 +47,30 @@ void atualizarResultado(const chess::Board &board, RespostaMovimento &response) 
     }
     switch (result.first) {
     case chess::GameResultReason::CHECKMATE:
+        response.desfecho = board.sideToMove() == chess::Color::WHITE
+                                ? ResultadoPartida::Derrota : ResultadoPartida::Vitoria;
         response.resultado = "Xeque-mate.";
         response.motivo = board.sideToMove() == chess::Color::WHITE
                                  ? "Stockfish venceu."
                                  : "Você venceu.";
         break;
     case chess::GameResultReason::STALEMATE:
+        response.desfecho = ResultadoPartida::Empate;
         response.resultado = "Empate";
         response.motivo = "Afogamento: não há lances legais e o rei não está em xeque.";
         break;
     case chess::GameResultReason::INSUFFICIENT_MATERIAL:
+        response.desfecho = ResultadoPartida::Empate;
         response.resultado = "Empate";
         response.motivo = "Material insuficiente para dar xeque-mate.";
         break;
     case chess::GameResultReason::THREEFOLD_REPETITION:
+        response.desfecho = ResultadoPartida::Empate;
         response.resultado = "Empate";
         response.motivo = "Tripla repetição: a mesma posição ocorreu três vezes.";
         break;
     case chess::GameResultReason::FIFTY_MOVE_RULE:
+        response.desfecho = ResultadoPartida::Empate;
         response.resultado = "Empate";
         response.motivo = "Regra dos 50 lances: 50 lances de cada lado sem captura ou movimento de peão.";
         break;
@@ -75,7 +81,8 @@ void atualizarResultado(const chess::Board &board, RespostaMovimento &response) 
 } // namespace
 
 Jogo::Jogo(const arquivos::path &stockfish, int tempoMs, int nivel, bool trace)
-    : nivel_(nivel), motor_(stockfish, tempoMs, nivelMotor(nivel), trace) {
+    : nivel_(nivel), motor_(stockfish, tempoMs, nivelMotor(nivel), trace),
+      caminhoMotor_(arquivos::absolute(stockfish)), trace_(trace) {
     motor_.novaPartida();
 }
 
@@ -134,6 +141,17 @@ std::unique_ptr<RespostaMovimento> Jogo::fazerMovimento(const std::string &movim
         history.push_back(response->movimento);
         atualizarResultado(candidate, *response);
     }
+    // Review is optional: failure must not invalidate a legal game or an engine reply.
+    // This runs in the existing background task and never shares the opponent process.
+    try {
+        if (!analista_) analista_ = std::make_unique<Stockfish>(caminhoMotor_, 600, 20, trace_);
+        const auto best = analista_->analisar(historico_);
+        const auto played = best.melhorMovimento == input ? best : analista_->analisar(historico_, input);
+        response->avaliacao = classificarJogada(input, best, played);
+    } catch (const std::exception &) {
+        response->avaliacao.movimento = input;
+        analista_.reset();
+    }
     tabuleiro_ = std::move(candidate);
     historico_ = std::move(history);
     return response;
@@ -141,6 +159,7 @@ std::unique_ptr<RespostaMovimento> Jogo::fazerMovimento(const std::string &movim
 
 void Jogo::reiniciar() {
     motor_.novaPartida();
+    analista_.reset();
     tabuleiro_ = chess::Board();
     historico_.clear();
 }

@@ -1,4 +1,4 @@
-"""Build the pinned Assimp FBX importer directly with GCC/Clang, without CMake."""
+"""Build the pinned Assimp FBX/glTF importers with GCC/Clang, without CMake."""
 from concurrent.futures import ThreadPoolExecutor
 import hashlib
 import json

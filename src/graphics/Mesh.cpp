@@ -36,6 +36,12 @@ void Mesh::draw() const {
     glDrawArrays(GL_TRIANGLES, 0, count);
 }
 
+void Mesh::update(const std::vector<Vertex> &vertices) {
+    count = static_cast<GLsizei>(vertices.size());
+    glBindBuffer(GL_ARRAY_BUFFER, vbo);
+    glBufferData(GL_ARRAY_BUFFER, vertices.size() * sizeof(Vertex), vertices.data(), GL_STREAM_DRAW);
+}
+
 std::vector<Vertex> Mesh::cube() {
     std::vector<Vertex> v;
     Vec3 p[] = {{-.5f, -.5f, -.5f}, {.5f, -.5f, -.5f}, {.5f, .5f, -.5f}, {-.5f, .5f, -.5f},

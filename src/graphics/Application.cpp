@@ -35,6 +35,7 @@ Application::~Application() {
         pending.wait();
     }
 
+    pet.reset();
     table.reset();
     notepad = nullptr;
     if (ImGui::GetCurrentContext()) {
@@ -232,6 +233,7 @@ void Application::submit(const std::string &move) {
     board->castling.clear();
     promotionPrefix.clear();
     status = "Stockfish pensando...";
+    pet->thinking();
     pending = std::async(std::launch::async, [this, move] {
         return game.fazerMovimento(move);
     });
@@ -250,12 +252,18 @@ void Application::update() {
             finished = response->fimPartida;
             resultTitle = response->resultado;
             resultReason = response->motivo;
+            lastReview = response->avaliacao;
+            lastOutcome = response->desfecho;
+            pet->review(lastReview);
+            pet->finish(lastOutcome);
             status = finished ? response->resultado : "Sua vez | Stockfish: " + response->movimento;
         } else {
             status = "Lance inválido. Tente novamente.";
+            pet->reset();
         }
     } catch (const std::exception &e) {
         status = std::string("Erro do motor: ") + e.what();
+        pet->reset();
     }
     refresh(reply);
 }
@@ -265,6 +273,9 @@ void Application::reset() {
         return;
     }
     game.reiniciar();
+    lastReview = {};
+    lastOutcome = ResultadoPartida::EmAndamento;
+    pet->reset();
     finished = false;
     resultTitle.clear();
     resultReason.clear();
@@ -478,6 +489,7 @@ int Application::run() {
     primitives = std::make_unique<Primitives>();
     board = std::make_unique<Board>(*primitives);
     table = std::make_unique<Table>();
+    pet = makePet(scenario);
     auto pad = std::make_unique<Notepad>();
     // Único ponto de configuração do bloco: modelo, texto e cliques seguem juntos.
     pad->position = {7.3f, Table::surfaceY + .025f, 3.7f};
@@ -505,6 +517,7 @@ int Application::run() {
         float dt = float(std::min(now - lastFrame, .05));
         lastFrame = now;
         board->update(dt);
+        pet->update(dt);
         update();
         ImGui_ImplOpenGL3_NewFrame();
         ImGui_ImplGlfw_NewFrame();
@@ -636,4 +649,9 @@ void Application::drawScene(Shader &sceneShader) {
     const auto identity = Mat4::identity();
     table->draw(sceneShader, identity);
     board->draw(sceneShader, identity);
+    pet->draw(sceneShader, table->model(identity));
+}
+
+std::unique_ptr<Pet> Application::makePet(const Scenario &scene) {
+    return std::make_unique<Pet>(scene.pet, pet.get());
 }

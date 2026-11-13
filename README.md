@@ -13,6 +13,7 @@ A cena reúne tabuleiro, mesa, céu panorâmico, iluminação, sombras e névoa.
 - Cinco opções de dificuldade na interface e níveis de −20 a 20 pela linha de comando.
 - Busca do Stockfish em segundo plano, mantendo a câmera e a renderização ativas.
 - Cenários configuráveis em arquivos de texto, sem recompilar o código C++.
+- 24 pets Cube Pets da Kenney em FBX, com cinco selecionados pelos cenários, passeios sobre a mesa e reações aos lances.
 
 ## Requisitos
 
@@ -76,7 +77,7 @@ A saída padrão é `build/darwin/bin/xadrez`. A compilação usa os frameworks 
 | `--output PASTA` | Define a pasta de saída do executável e dos recursos. |
 | `--engine CAMINHO` | Copia e verifica um executável local do Stockfish. |
 
-O script chama os compiladores diretamente, sem CMake. Ele baixa e verifica o Assimp 5.4.3, compila o importador FBX e a zlib em uma biblioteca estática e a vincula ao jogo. A primeira compilação demora mais; os objetos do Assimp e do GLFW ficam em cache para as próximas compilações. Não é necessário instalar Assimp nem copiar uma DLL.
+O script chama os compiladores diretamente, sem CMake. Ele baixa e verifica o Assimp 5.4.3, compila os importadores FBX e glTF e a zlib em uma biblioteca estática e a vincula ao jogo. A primeira compilação demora mais; os objetos do Assimp e do GLFW ficam em cache para as próximas compilações. Não é necessário instalar Assimp nem copiar uma DLL.
 
 Os scripts `compilar.bat` e `compilar.sh` encaminham os argumentos para `tools/build.py`. Por exemplo, `./compilar.bat --run` no PowerShell ou `sh compilar.sh --run` no Linux/macOS.
 
@@ -182,6 +183,56 @@ Os caminhos de cenário são relativos à pasta do executável; caminhos absolut
 
 A descrição de cada parâmetro está em [assets/scenarios/README.md](assets/scenarios/README.md). Os shaders ficam em `shaders/`: a cena usa iluminação Blinn–Phong, madeira procedural e sombras com mapa principal de 8192 × 8192, mapa adicional de 4096 × 4096 para o sol vermelho e suavização PCF 3 × 3.
 
+## Pets e avaliação dos lances
+
+Cada cenário traz um companheiro: Abelha no Iniciante, Panda no Fácil, Raposa no
+Intermediário, Vaca no Difícil e Gato no Impossível. O pet reage à avaliação do
+último lance das brancas. A troca de dificuldade preserva a posição, a direção
+e o andamento do passeio ou da reação, sem repetir a última avaliação;
+uma nova partida encerra a dança ou reação atual e retoma a caminhada ou a pausa
+de onde parou, mantendo a posição e o progresso do passeio.
+
+| Valor da posição após o lance, pela perspectiva das brancas | Reação |
+| --- | --- |
+| A partir de +1,00 peão | Gesto de aprovação. |
+| Até −1,00 peão | Gesto de desaprovação. |
+| Entre −1,00 e +1,00 peão, sem incluir os limites | Continua a caminhada ou a pausa, sem gesto. |
+| Mate favorável ou desfavorável | Aprovação ou desaprovação, respectivamente. |
+
+O pet fica diretamente sobre a mesa, voltado ao tabuleiro durante as pausas.
+Ele caminha na faixa livre à esquerda, com pausas nas extremidades e no meio
+do trajeto, sem cruzar o tabuleiro nem o bloco de notas. As reações interrompem
+o passeio. Na vitória, dança até uma nova partida; na derrota, faz o gesto negativo;
+no empate, o positivo.
+Durante a busca, fica em repouso olhando para o tabuleiro. A classificação do
+lance continua disponível internamente, mas o gesto depende do valor da posição.
+
+Os 24 modelos e suas animações são do pacote **Cube Pets**, criado por
+[Kenney](https://kenney.nl), sob licença [CC0](assets/objects/pets/License.txt).
+Os FBX ficam em `assets/objects/pets/`, com a paleta compartilhada em
+`Textures/colormap.png`. Todos oferecem `static`, `idle`, `walk`, `run`, `eat`,
+`dance`, `gesture-positive` e `gesture-negative`. Os identificadores disponíveis
+para a configuração estão em `include/PetCatalog.h`.
+
+A análise usa um processo separado do Stockfish em nível 20, com buscas de até
+600 ms para a melhor opção e para o lance escolhido. A classificação compara a
+pontuação esperada de vitória/empate/derrota na mesma posição, sempre pela
+perspectiva das brancas. Ela é uma estimativa e não altera a dificuldade do
+adversário. Se a análise falhar, o lance continua válido e o pet mantém o
+comportamento de repouso e passeio, sem um gesto de avaliação.
+
+Após compilar pelo script Python, execute os testes de modelos, animações e
+avaliação com o Stockfish local:
+
+```powershell
+python tools/test_pets.py
+python tools/test_pets.py --render
+```
+
+A opção `--render` também verifica os 24 pets com texturas, passeios, sombras,
+reações e reinício em uma janela OpenGL oculta, salvando capturas `pet-*.png` em `build/`.
+Use `--no-engine` para verificar apenas os modelos e, opcionalmente, a renderização.
+
 ## Organização do código
 
 | Local | Responsabilidade |
@@ -192,6 +243,8 @@ A descrição de cada parâmetro está em [assets/scenarios/README.md](assets/sc
 | `src/graphics/Application.cpp` | Janela, eventos, câmera, seleção, renderização e busca assíncrona. |
 | `src/graphics/ApplicationUI.cpp` | Estado da partida e resultado final em Dear ImGui. |
 | `src/graphics/Notepad.cpp` | Bloco 3D, textura da interface e seleção das linhas na folha. |
+| `src/graphics/Pet.cpp`, `AnimatedModel.cpp` e `include/PetCatalog.h` | Catálogo dos pets Kenney, passeios e animações FBX. |
+| `src/avaliacao.hpp` | Leitura das avaliações UCI e classificação do lance humano. |
 | `src/graphics/` | Tabuleiro, mesa, skybox, cenários, malhas, objetos e shaders. |
 | `src/pieces/` | Associação de cada tipo de peça ao modelo e desenho. |
 | `include/` | Cabeçalhos da camada gráfica e operações matemáticas em `Math3D.h`. |
@@ -215,6 +268,7 @@ Para usar um Stockfish próprio, informe `--engine` ao script de compilação ou
 O código próprio está sob a [licença MIT](LICENSE). As dependências mantêm suas licenças e avisos nos respectivos diretórios:
 
 - [Assimp](vendor/Assimp-LICENSE.txt) (BSD de 3 cláusulas).
+- Pets Cube Pets, modelos, textura e animações por [Kenney](https://kenney.nl): [CC0](assets/objects/pets/License.txt).
 - [GLFW](vendor/glfw/LICENSE.md).
 - GLAD: avisos nos arquivos em `vendor/glfw/deps/glad/`.
 - [Dear ImGui](vendor/imgui/LICENSE.txt).

@@ -10,6 +10,7 @@ uniform mat4 lightViewProjection;
 uniform float shadowNormalOffset;
 
 out vec3 worldPosition;
+out vec2 modelUv;
 out vec3 localPosition;
 out vec3 localNormal;
 out vec3 worldNormal;
@@ -24,6 +25,7 @@ void main() {
     lightSpacePosition = lightViewProjection * vec4(
         transformedPosition.xyz + surfaceNormal * shadowNormalOffset, 1.0);
     worldPosition = transformedPosition.xyz;
+    modelUv = uv;
     localPosition = position;
     localNormal = normal;
     worldNormal = normalMatrix * normal;
