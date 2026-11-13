@@ -1,6 +1,9 @@
 #version 330 core
 
 in vec3 worldPosition;
+in vec2 modelUv;
+uniform bool modelTextureEnabled;
+uniform sampler2D modelTexture;
 uniform bool pageTextureEnabled;
 uniform sampler2D pageTexture;
 uniform float pageHeight;
@@ -84,6 +87,7 @@ void main() {
     float specular = diffuse > 0.0 ? pow(max(dot(normal, halfwayDirection), 0.0), shininess) : 0.0;
     float visibility = 1.0 - shadowAmount(normal, lightDirection, lightSpacePosition, shadowMap, shadowsEnabled);
     vec3 materialColor = color;
+    if (modelTextureEnabled) materialColor *= texture(modelTexture, modelUv).rgb;
     if (ruledPaperEnabled) {
         // Coordenadas locais: as pautas acompanham o bloco e a curva do papel.
         vec2 paperPixel = (localPosition.xz - rulingMapping.xy) * rulingMapping.zw;

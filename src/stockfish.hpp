@@ -1,6 +1,7 @@
 #pragma once
 
 #include "arquivos.hpp"
+#include "avaliacao.hpp"
 #include <memory>
 #include <string>
 #include <vector>
@@ -19,6 +20,9 @@ class Stockfish {
     std::string responder(const std::vector<std::string> &history,
                           std::vector<std::string> *melhores = nullptr);
     void novaPartida();
+    // Analysis instance should use Skill Level 20, separately from the opponent.
+    AvaliacaoPosicao analisar(const std::vector<std::string> &history,
+                             const std::string &somenteMovimento = "");
 
     // Alterações valem para a próxima busca e são mantidas em novaPartida().
     // Valores inválidos lançam std::invalid_argument sem alterar a configuração.

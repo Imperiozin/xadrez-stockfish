@@ -5,6 +5,7 @@
 #include "Skybox.h"
 #include "Table.h"
 #include "Notepad.h"
+#include "Pet.h"
 #include "jogo.hpp"
 #include <GLFW/glfw3.h>
 #include <future>
@@ -27,6 +28,9 @@ class Application {
     std::unique_ptr<Primitives> primitives;
     std::unique_ptr<Board> board;
     std::unique_ptr<Table> table;
+    std::unique_ptr<Pet> pet;
+    AvaliacaoJogada lastReview;
+    std::unique_ptr<Pet> makePet(const Scenario &scene);
     Notepad *notepad = nullptr; // A mesa possui o objeto; este ponteiro apenas encaminha eventos.
     std::future<std::unique_ptr<RespostaMovimento>> pending;
     std::vector<std::string> legal;

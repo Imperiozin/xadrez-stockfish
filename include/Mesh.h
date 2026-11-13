@@ -19,6 +19,7 @@ class Mesh {
     Mesh(const Mesh &) = delete;
     Mesh &operator=(const Mesh &) = delete;
     void draw() const;
+    void update(const std::vector<Vertex> &vertices);
     static std::vector<Vertex> cube();
     static std::vector<Vertex> cylinder(float topRadius = 1);
     static std::vector<Vertex> sphere();

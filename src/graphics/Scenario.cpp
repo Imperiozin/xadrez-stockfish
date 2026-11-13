@@ -42,6 +42,7 @@ Scenario Scenario::load(const std::string &file) {
             if (!(values >> key)) continue;
             auto vector = [&](Vec3 &v) { values >> v.x >> v.y >> v.z; };
             if (key == "skybox") values >> scene.skybox;
+            else if (key == "pet") values >> scene.pet;
             else if (key == "lightPosition") vector(scene.lightPosition);
             else if (key == "lightColor") vector(scene.lightColor);
             else if (key == "ambientColor") vector(scene.ambientColor);
@@ -91,7 +92,9 @@ Scenario Scenario::load(const std::string &file) {
     read(pastaDoExecutavel() / "assets/scenarios/global.cfg");
     const auto path = pastaDoExecutavel() / file;
     read(path);
-    if (scene.skybox.empty() || scene.shadowNear <= 0 || scene.shadowFar <= scene.shadowNear ||
+    if ((scene.pet != "Penguin" && scene.pet != "Panda" && scene.pet != "Deer" &&
+         scene.pet != "Alien" && scene.pet != "Ghost") ||
+        scene.skybox.empty() || scene.shadowNear <= 0 || scene.shadowFar <= scene.shadowNear ||
         scene.shadowFov <= 0 || scene.shadowFov >= 179 || scene.lightIntensity < 0 ||
         scene.ambientStrength < 0 || scene.diffuseStrength < 0 || scene.specularStrength < 0 ||
         scene.woodSpecularStrength < 0 || scene.shininess <= 0 || scene.fogDensity < 0 ||

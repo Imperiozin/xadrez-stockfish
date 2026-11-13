@@ -73,6 +73,7 @@ void Shader::use(const Mat4 &vp, Vec3 eye) {
     // Samplers of different types must use different units even in inactive branches.
     glUniform1i(glGetUniformLocation(id, "secondaryShadowMap"), 2);
     glUniform1i(glGetUniformLocation(id, "pageTexture"), 1);
+    glUniform1i(glGetUniformLocation(id, "modelTexture"), 3);
     glUniformMatrix4fv(glGetUniformLocation(id, "viewProjection"), 1, GL_FALSE, vp.v);
     glUniform3f(glGetUniformLocation(id, "eye"), eye.x, eye.y, eye.z);
 }
@@ -116,11 +117,19 @@ void Shader::environment(const Scenario &scene) {
 }
 
 void Shader::object(const Mat4 &m, Vec3 c, bool wood) {
+    glUniform1i(glGetUniformLocation(id, "modelTextureEnabled"), GL_FALSE);
     glUniform1i(glGetUniformLocation(id, "pageTextureEnabled"), GL_FALSE);
     glUniform1i(glGetUniformLocation(id, "ruledPaperEnabled"), GL_FALSE);
     glUniform1i(glGetUniformLocation(id, "woodMaterial"), wood);
     glUniformMatrix4fv(glGetUniformLocation(id, "model"), 1, GL_FALSE, m.v);
     glUniform3f(glGetUniformLocation(id, "color"), c.x, c.y, c.z);
+}
+
+void Shader::modelTexture(GLuint texture) {
+    glUniform1i(glGetUniformLocation(id, "modelTextureEnabled"), texture != 0);
+    glActiveTexture(GL_TEXTURE3);
+    glBindTexture(GL_TEXTURE_2D, texture);
+    glActiveTexture(GL_TEXTURE0);
 }
 
 void Shader::pageTexture(GLuint texture, float height) {

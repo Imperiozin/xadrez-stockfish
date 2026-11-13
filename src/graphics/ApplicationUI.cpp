@@ -75,12 +75,14 @@ void Application::setDifficulty(int level) {
         if (level == interfaceDifficulty) return;
         auto next = Scenario::load(Scenario::fileForDifficulty(level));
         auto nextSkybox = std::make_unique<Skybox>(next.skybox);
+        auto nextPet = makePet(next);
         if (next.animation == Scenario::Animation::BinarySuns ||
             next.animation == Scenario::Animation::Storm) initializeShadows(true);
         // Commit only after all resources load successfully.
         game.definirDificuldade(level);
         scenario = std::move(next);
         skybox = std::move(nextSkybox);
+        pet = std::move(nextPet);
         scenarioStart = glfwGetTime();
         frameScenario = scenario.sample(0, environmentSeed);
         interfaceDifficulty = game.dificuldade();
