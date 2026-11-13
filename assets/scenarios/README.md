@@ -1,43 +1,98 @@
-# Cenários
+# Cenários e iluminação
 
-O jogo carrega `sunset.cfg` por padrão. Cada arquivo reúne a pasta da skybox,
-a iluminação, a névoa e a projeção das sombras. Os shaders recebem esses valores
-em tempo de execução.
+O jogo escolhe o cenário pela dificuldade e troca o ambiente ao selecionar outra
+opção no bloco sobre a mesa. A troca preserva a partida e reinicia a animação.
+O nível padrão continua sendo Intermediário (`--skill 0`).
 
-Edite o arquivo de origem e rode `python tools/build.py --run` para copiar os
-assets e iniciar o jogo. Para experimentar sem recompilar, edite a cópia em
-`build/windows/bin/assets/scenarios/sunset.cfg` e reabra o executável; o próximo
-build sobrescreve essa cópia.
+| Arquivo | Skybox | Dificuldade | Iluminação |
+| --- | --- | --- | --- |
+| `1.cfg` | `assets/skybox/1` — arco-íris | Iniciante, −20 | Dia claro, luz quente, ambiente azulado. |
+| `2.cfg` | `assets/skybox/2` — jardim zen | Fácil, −10 | Luz difusa neutra com leve tom verde. |
+| `3.cfg` | `assets/skybox/3` — pôr do sol | Intermediário, 0 | Luz baixa e alaranjada. |
+| `4.cfg` | `assets/skybox/4` — planeta com dois sóis | Difícil, 10 | Sol normal e sol vermelho menor, móveis, com eclipses. |
+| `5.cfg` | `assets/skybox/5` — bosque assombrado | Impossível, 20 | Pouca luz azulada, névoa e relâmpagos. |
 
-Para criar outro cenário, duplique `sunset.cfg`, ajuste `skybox` e a iluminação.
-Mantenha as seis faces PNG na pasta indicada por `skybox` com os nomes existentes.
-Depois de copiar os assets pelo build, selecione o cenário ao iniciar:
+Níveis intermediários da linha de comando usam a opção mais próxima; os pontos
+médios (−15, −5, 5, 15) pertencem à opção superior. As faces mantêm os nomes
+`right.png`, `left.png`, `top.png`, `bottom.png`, `front.png` e `back.png`,
+necessários ao carregamento OpenGL. A numeração identifica a pasta.
+
+## Configuração global
+
+`assets/scenarios/global.cfg` é carregado automaticamente **antes** do cenário.
+Ele centraliza materiais e ajustes de sombras iguais nos cinco ambientes;
+esses parâmetros não são repetidos nos arquivos numerados. Um cenário
+personalizado também herda o global e pode sobrescrever seus valores.
+
+| Parâmetro global | Função |
+| --- | --- |
+| `diffuseStrength` | Resposta difusa dos materiais. |
+| `specularStrength`, `woodSpecularStrength`, `shininess` | Força e concentração dos brilhos, incluindo a madeira. |
+| `shadowAutoFit` | `1` ajusta automaticamente a projeção de cada luz; `0` usa os planos manuais. |
+| `shadowRadius` | Raio do volume de sombras ao redor do tabuleiro; padrão 20. |
+| `shadowFov`, `shadowNear`, `shadowFar` | Abertura em graus e planos de corte do modo manual. |
+| `shadowBias`, `shadowMinBias`, `shadowNormalOffset` | Compensações contra autossombreamento; valores altos podem afastar sombras de contato. |
+
+## Configuração de cada ambiente
+
+| Parâmetro | Função |
+| --- | --- |
+| `skybox` | Pasta com as seis faces PNG. |
+| `animation` | `static`, `binary` ou `storm`. |
+| `lightPosition` | Posição XYZ da luz principal, voltada para o centro da cena. |
+| `lightColor`, `lightIntensity` | Cor RGB e intensidade direta, independente da distância. |
+| `ambientColor`, `ambientStrength` | Cor e intensidade nas áreas de sombra. |
+| `skyBrightness` | Multiplicador do brilho da skybox. |
+| `fogColor`, `fogDensity` | Cor e densidade da névoa; densidade zero a desativa. |
+
+### Dois sóis — `4.cfg`
+
+O sol normal e o vermelho são discos desenhados sobre a skybox e fontes de luz
+independentes, cada um com seu mapa de sombras. A imagem do deserto permanece
+como fundo. O movimento dos discos acompanha a direção da iluminação e das sombras.
+
+- `secondaryLightColor`, `secondaryLightIntensity`: cor e intensidade do sol menor.
+- `lightPosition`: direção inicial do sol principal; a órbita calcula as duas
+  posições ao longo do tempo.
+- `sunRadius`, `secondarySunRadius`: raios aparentes em radianos. O vermelho deve
+  ser menor que o principal.
+- `orbitPeriod`: duração, em segundos, de uma volta dos sóis no céu.
+- `eclipsePeriod`: duração do ciclo relativo; há dois alinhamentos por ciclo.
+
+Os sóis permanecem acima do horizonte e alternam qual fica à frente. O vermelho
+oculta parte do maior ao passar à frente, e pode ser totalmente encoberto ao
+passar atrás. A luz varia pela área de sobreposição dos discos; o ambiente e a
+skybox escurecem junto. Com os períodos padrão, os primeiros eclipses ocorrem
+aproximadamente aos 25 e 60 segundos.
+
+### Tempestade — `5.cfg`
+
+- `lightningInterval`: intervalo central entre eventos, em segundos.
+- `lightningJitter`: variação dos instantes de início. Com intervalo 12 e variação
+  4, os eventos ficam separados por 8 a 16 segundos.
+- `lightningStrength`: intensidade da luz azulada dos relâmpagos.
+
+Cada evento sorteia direção, altura e formato ramificado do raio. O clarão tem
+três pulsos rápidos com espaçamento e força variáveis; ilumina peças, tabuleiro,
+mesa, céu e névoa. Durante o clarão, a luz do relâmpago projeta sombras conforme
+a direção sorteada, além das sombras da luz noturna. O mapa de sombras do raio
+só é atualizado enquanto sua luz está ativa. Uma nova execução sorteia outra sequência,
+sem depender da taxa de quadros.
+
+## Editar e executar
+
+Edite os arquivos de origem e execute `python tools/build.py --run` para copiar
+os recursos e abrir o jogo. Também é possível editar as cópias em
+`build/windows/bin/assets/scenarios/` e reabrir o executável, sem recompilar;
+o próximo build sobrescreve essas cópias.
 
 ```powershell
-.\build\windows\bin\xadrez.exe --scenario assets/scenarios/outro.cfg
+.\build\windows\bin\xadrez.exe --skill 10
+.\build\windows\bin\xadrez.exe --scenario assets/scenarios/5.cfg
 ```
 
-Os caminhos são relativos à pasta do executável; caminhos absolutos também são
-aceitos. Cada linha contém um nome e seus valores, separados por espaços.
-Comentários começam com `#`.
-
-- `lightPosition`: posição XYZ da fonte, apontada para a origem da cena.
-- `lightColor`: cor RGB, normalmente entre 0 e 1.
-- `lightIntensity`: multiplicador da luz direta, independente da distância.
-- `ambientColor` e `ambientStrength`: cor e força da luz nas áreas de sombra.
-- `diffuseStrength`, `specularStrength`, `woodSpecularStrength`, `shininess`:
-  resposta difusa e dos brilhos.
-- `fogColor` e `fogDensity`: cor e densidade da névoa; densidade 0 a desativa.
-- `shadowFov`: abertura da câmera da luz em graus.
-- `shadowAutoFit`: 1 ajusta automaticamente a abertura e os planos de corte
-  quando a luz muda de posição; 0 usa `shadowFov`, `shadowNear` e `shadowFar`.
-- `shadowRadius`: raio do volume ao redor da origem que precisa receber e
-  projetar sombras. O padrão 20 inclui a mesa inteira e seus pés. Aumente para
-  objetos fora desse volume; a luz deve estar além desse raio.
-- `shadowNear` e `shadowFar`: limites de profundidade, em unidades da cena.
-  No modo manual, ajuste-os para incluir toda a mesa e os objetos.
-- `shadowBias` e `shadowMinBias`: compensação de profundidade para evitar
-  marcas de autossombreamento; valores excessivos afastam as sombras dos objetos.
-- `shadowNormalOffset`: deslocamento da consulta à sombra ao longo da normal,
-  em unidades do mundo. Suprime marcas nas superfícies curvas; valores altos
-  podem afastar as sombras de contato. O padrão é 0.012.
+`--scenario` escolhe apenas o ambiente inicial, sem mudar a força do motor.
+Ao selecionar outra dificuldade, o cenário correspondente volta a ser aplicado.
+Os caminhos são relativos ao executável; caminhos absolutos também são aceitos.
+Cada linha contém uma chave e valores separados por espaços; comentários começam
+com `#`.

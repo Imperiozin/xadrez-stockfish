@@ -28,7 +28,7 @@ int main(int argc, char **argv) {
 #endif
         int time = 300, skill = 0;
         bool trace = false;
-        std::string scenarioFile = "assets/scenarios/sunset.cfg";
+        std::string scenarioFile;
         for (int i = 1; i < argc; ++i) {
             std::string arg = argv[i];
             if (arg == "--trace") {

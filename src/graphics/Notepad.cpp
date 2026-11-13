@@ -105,10 +105,9 @@ void Notepad::load() {
     const auto best = std::max_element(planes.begin(), planes.end(),
         [](const auto &a, const auto &b) { return a.second.area < b.second.area; });
     const auto &plane = best->second;
-    // Reserva a borda e evita a parte curva da folha na extremidade inferior.
+    // A projeção cobre a folha até a borda; tinta e cliques acompanham a malha curva.
     page.topLeft = {plane.low.x + .20f, plane.y, plane.low.z + .35f};
-    page.bottomRight = {plane.high.x - .20f, page.topLeft.y,
-                       plane.low.z + (plane.high.z - plane.low.z) * .60f};
+    page.bottomRight = {plane.high.x - .20f, page.topLeft.y, plane.high.z - .20f};
     if (page.bottomRight.x <= page.topLeft.x || page.bottomRight.z <= page.topLeft.z)
         throw std::runtime_error("Área útil insuficiente na folha do bloco de notas.");
 }
@@ -194,19 +193,24 @@ Notepad::Hit Notepad::hit(const Ray &ray, const Mat4 &parent) const {
     for (const auto &part : parts) {
         for (size_t i = 0; i < part.vertices.size(); i += 3) {
             float distance;
-            if (intersectTriangle(local, part.vertices[i].position, part.vertices[i + 1].position,
-                                  part.vertices[i + 2].position, distance)) {
+            const auto a = part.vertices[i].position, b = part.vertices[i + 1].position,
+                       c = part.vertices[i + 2].position;
+            if (intersectTriangle(local, a, b, c, distance) && distance < result.distance) {
                 result.body = true;
-                result.distance = std::min(result.distance, distance);
+                result.distance = distance;
+                result.page = false;
+                const auto point = local.origin + local.direction * distance;
+                const auto normal = cross(b - a, c - a);
+                const Vec2 uv{(point.x - page.topLeft.x) / (page.bottomRight.x - page.topLeft.x),
+                              (point.z - page.topLeft.z) / (page.bottomRight.z - page.topLeft.z)};
+                if (part.ruled && point.y >= page.topLeft.y - .0005f &&
+                    normal.y > 0 && dot(normal, local.direction) < 0 &&
+                    uv.x >= 0 && uv.x <= 1 && uv.y >= 0 && uv.y <= 1) {
+                    result.page = true;
+                    result.pixel = {uv.x * canvasWidth, uv.y * canvasHeight};
+                }
             }
         }
-    }
-    Vec2 uv;
-    float distance;
-    if (page.intersect(local, uv, distance) && distance <= result.distance + .0001f) {
-        result.body = result.page = true;
-        result.distance = distance;
-        result.pixel = {uv.x * canvasWidth, uv.y * canvasHeight};
     }
     return result;
 }
@@ -246,8 +250,9 @@ Notepad::Action Notepad::renderInterface(float dt, int difficulty, bool disabled
     ImGui::SetNextWindowSize(io.DisplaySize);
     ImGui::Begin("Configurações da partida###notepad", nullptr,
         ImGuiWindowFlags_NoDecoration | ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoSavedSettings |
-        ImGuiWindowFlags_NoBackground | ImGuiWindowFlags_NoNav);
-    auto *draw = ImGui::GetWindowDrawList();
+        ImGuiWindowFlags_NoBackground | ImGuiWindowFlags_NoNav |
+        ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoScrollWithMouse);
+    auto *draw = ImGui::GetForegroundDrawList();
     const ImU32 ink = IM_COL32(35, 49, 65, 255);
     const ImU32 blue = IM_COL32(35, 91, 145, 255);
     // Alinha o texto pela linha de base da fonte.
@@ -279,14 +284,21 @@ Notepad::Action Notepad::renderInterface(float dt, int difficulty, bool disabled
         if (hovered) draw->AddLine(ImVec2(100, y + 68), ImVec2(730, y + 68), color, 2);
         ImGui::PopID();
     }
-    ImGui::SetCursorPos(ImVec2(18, 552));
-    if (ImGui::InvisibleButton("Nova partida", ImVec2(732, 76))) action.newGame = true;
-    const bool hovered = ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled);
-    if (hovered && !disabled) pointerOnControl = true;
-    const auto color = hovered ? blue : ink;
-    write(ImVec2(100, 600), color, "Nova partida", handwritingSize);
-    if (hovered) draw->AddLine(ImVec2(100, 622), ImVec2(730, 622), color, 2);
+    auto rightAlignedButton = [&](const char *label, float y) {
+        const float width = ImGui::GetFont()->CalcTextSizeA(handwritingSize, FLT_MAX, 0, label).x;
+        const float x = 730.f - width;
+        ImGui::SetCursorPos(ImVec2(x - 12.f, y));
+        const bool clicked = ImGui::InvisibleButton(label, ImVec2(width + 24.f, 76));
+        const bool hovered = ImGui::IsItemHovered();
+        if (hovered) pointerOnControl = true;
+        const auto color = hovered ? blue : ink;
+        write(ImVec2(x, y + 48), color, label, handwritingSize);
+        if (hovered) draw->AddLine(ImVec2(x, y + 68), ImVec2(730, y + 68), color, 2);
+        return clicked;
+    };
+    action.newGame = rightAlignedButton("Nova partida", 476);
     ImGui::EndDisabled();
+    action.close = rightAlignedButton("Fechar", canvasHeight - 88.f);
     ImGui::End();
     ImGui::Render();
 
@@ -301,7 +313,15 @@ Notepad::Action Notepad::renderInterface(float dt, int difficulty, bool disabled
     glDisable(GL_SCISSOR_TEST);
     glClearColor(0, 0, 0, 0);
     glClear(GL_COLOR_BUFFER_BIT);
-    ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
+    // Envia somente a tinta: nenhuma decoração ou fundo de janela vai para o papel.
+    const auto *frame = ImGui::GetDrawData();
+    ImDrawData inkData;
+    inkData.Valid = true;
+    inkData.DisplayPos = frame->DisplayPos;
+    inkData.DisplaySize = frame->DisplaySize;
+    inkData.FramebufferScale = frame->FramebufferScale;
+    inkData.AddDrawList(draw);
+    ImGui_ImplOpenGL3_RenderDrawData(&inkData);
     glBindFramebuffer(GL_FRAMEBUFFER, oldFramebuffer);
     // Filtra a redução da página em perspectiva para evitar falhas nos traços.
     GLint oldTexture;

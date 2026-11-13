@@ -47,10 +47,10 @@ void atualizarResultado(const chess::Board &board, RespostaMovimento &response) 
     }
     switch (result.first) {
     case chess::GameResultReason::CHECKMATE:
-        response.resultado = board.sideToMove() == chess::Color::WHITE
-                                 ? "Xeque-mate."
-                                 : "Xeque-mate.";
-        response.motivo = "Stockfish venceu.";
+        response.resultado = "Xeque-mate.";
+        response.motivo = board.sideToMove() == chess::Color::WHITE
+                                 ? "Stockfish venceu."
+                                 : "Você venceu.";
         break;
     case chess::GameResultReason::STALEMATE:
         response.resultado = "Empate";

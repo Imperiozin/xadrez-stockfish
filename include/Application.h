@@ -12,14 +12,17 @@
 class Application {
     Jogo &game;
     std::string scenarioFile;
-    Scenario scenario;
+    Scenario scenario, frameScenario;
+    double scenarioStart = 0;
+    std::uint32_t environmentSeed = 0;
     GLFWwindow *window = nullptr;
     std::unique_ptr<Shader> shader;
     std::unique_ptr<Shader> depthShader;
     std::unique_ptr<Skybox> skybox;
     GLuint shadowFramebuffer = 0, shadowMap = 0;
+    GLuint secondaryShadowFramebuffer = 0, secondaryShadowMap = 0;
     static constexpr int shadowResolution = 8192;
-    void initializeShadows();
+    void initializeShadows(bool secondary = false);
     void drawScene(Shader &sceneShader);
     std::unique_ptr<Primitives> primitives;
     std::unique_ptr<Board> board;
@@ -63,7 +66,7 @@ class Application {
     void key(int key);
 
   public:
-    explicit Application(Jogo &game, const std::string &scenarioFile = "assets/scenarios/sunset.cfg")
+    explicit Application(Jogo &game, const std::string &scenarioFile = "")
         : game(game), scenarioFile(scenarioFile) {}
 
     ~Application();

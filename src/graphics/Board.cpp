@@ -63,7 +63,7 @@ void Board::animateMove(const std::string &move, const std::string &fen) {
     }
     const auto displacement = squarePosition(to) - squarePosition(from);
     animationDuration = std::clamp(.32f + .055f * std::sqrt(dot(displacement, displacement)),
-                                 .38f, .65f);
+                                 .52f, .65f);
     animationTime = 0;
     animationFen = fen;
 }

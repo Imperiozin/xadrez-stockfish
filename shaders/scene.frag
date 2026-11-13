@@ -33,10 +33,18 @@ uniform vec3 fogColor;
 uniform float fogDensity;
 uniform float shadowBias;
 uniform float shadowMinBias;
+uniform float shadowNormalOffset;
+uniform vec3 secondaryLightPosition;
+uniform vec3 secondaryLightColor;
+uniform float secondaryLightIntensity;
+uniform mat4 secondaryLightViewProjection;
+uniform sampler2DShadow secondaryShadowMap;
+uniform bool secondaryShadowsEnabled;
 
-float shadowAmount(vec3 normal, vec3 lightDirection) {
-    if (!shadowsEnabled || lightSpacePosition.w <= 0.0) return 0.0;
-    vec3 projected = lightSpacePosition.xyz / lightSpacePosition.w;
+float shadowAmount(vec3 normal, vec3 lightDirection, vec4 lightSpace,
+                   sampler2DShadow depthMap, bool enabled) {
+    if (!enabled || lightSpace.w <= 0.0) return 0.0;
+    vec3 projected = lightSpace.xyz / lightSpace.w;
     projected = projected * 0.5 + 0.5;
     if (projected.z <= 0.0 || projected.z >= 1.0 ||
         any(lessThan(projected.xy, vec2(0.0))) ||
@@ -44,14 +52,14 @@ float shadowAmount(vec3 normal, vec3 lightDirection) {
 
     // Stable normal bias; no inversion of screen-space derivatives at silhouettes.
     float bias = max(shadowBias * (1.0 - max(dot(normal, lightDirection), 0.0)), shadowMinBias);
-    vec2 texel = 1.0 / vec2(textureSize(shadowMap, 0));
+    vec2 texel = 1.0 / vec2(textureSize(depthMap, 0));
     float shadow = 0.0;
     // PCF 3 × 3 suaviza a transição entre luz e sombra.
     for (int x = -1; x <= 1; ++x) {
         for (int y = -1; y <= 1; ++y) {
             vec2 offset = vec2(x, y) * texel;
             // Hardware compares depths before filtering, smoothing shadow edges.
-            shadow += 1.0 - texture(shadowMap, vec3(projected.xy + offset, projected.z - bias));
+            shadow += 1.0 - texture(depthMap, vec3(projected.xy + offset, projected.z - bias));
         }
     }
     return shadow / 9.0;
@@ -74,7 +82,7 @@ void main() {
     // Iluminacao ambiente, difusa e especular (Blinn-Phong).
     float diffuse = max(dot(normal, lightDirection), 0.0);
     float specular = diffuse > 0.0 ? pow(max(dot(normal, halfwayDirection), 0.0), shininess) : 0.0;
-    float visibility = 1.0 - shadowAmount(normal, lightDirection);
+    float visibility = 1.0 - shadowAmount(normal, lightDirection, lightSpacePosition, shadowMap, shadowsEnabled);
     vec3 materialColor = color;
     if (ruledPaperEnabled) {
         // Coordenadas locais: as pautas acompanham o bloco e a curva do papel.
@@ -89,11 +97,11 @@ void main() {
         materialColor = mix(materialColor, vec3(187.0, 87.0, 77.0) / 255.0, margin * (75.0 / 255.0));
     }
     if (pageTextureEnabled) {
-        vec2 uv = (localPosition.xz - rulingMapping.xy) * rulingMapping.zw / vec2(768.0, 640.0);
+        vec2 uv = (localPosition.xz - rulingMapping.xy) * rulingMapping.zw / vec2(textureSize(pageTexture, 0));
         vec4 ink = texture(pageTexture, clamp(vec2(uv.x, 1.0 - uv.y), vec2(0.0), vec2(1.0)));
         // A UI usa a própria superfície da folha, sem um retângulo sobreposto.
         if (all(greaterThanEqual(uv, vec2(0.0))) && all(lessThanEqual(uv, vec2(1.0))) &&
-            abs(localPosition.y - pageHeight) < 0.0005 && normalize(localNormal).y > 0.99) {
+            localPosition.y >= pageHeight - 0.0005 && normalize(localNormal).y > 0.15) {
             // O framebuffer do ImGui contém cor pré-multiplicada pelo alfa.
             materialColor = materialColor * (1.0 - ink.a) + ink.rgb;
         }
@@ -111,6 +119,19 @@ void main() {
                   + visibility * lightColor * lightIntensity
                   * (materialColor * diffuseStrength * diffuse
                   + vec3(woodMaterial ? woodSpecularStrength : specularStrength) * specular);
+
+    if (secondaryLightIntensity > 0.0) {
+        vec3 secondaryDirection = normalize(secondaryLightPosition - worldPosition);
+        float secondaryDiffuse = max(dot(normal, secondaryDirection), 0.0);
+        float secondarySpecular = secondaryDiffuse > 0.0
+            ? pow(max(dot(normal, normalize(secondaryDirection + viewDirection)), 0.0), shininess) : 0.0;
+        vec4 secondarySpace = secondaryLightViewProjection * vec4(worldPosition + normal * shadowNormalOffset, 1.0);
+        float secondaryVisibility = 1.0 - shadowAmount(normal, secondaryDirection,
+            secondarySpace, secondaryShadowMap, secondaryShadowsEnabled);
+        litColor += secondaryVisibility * secondaryLightColor * secondaryLightIntensity
+            * (materialColor * diffuseStrength * secondaryDiffuse
+            + vec3(woodMaterial ? woodSpecularStrength : specularStrength) * secondarySpecular);
+    }
 
     // A nevoa aumenta com o quadrado da distancia ate a camera.
     float distanceSquared = dot(eyeOffset, eyeOffset);

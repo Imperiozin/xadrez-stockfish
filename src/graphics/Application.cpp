@@ -9,6 +9,7 @@
 
 #include <chrono>
 #include <iostream>
+#include <random>
 #include <stdexcept>
 
 namespace {
@@ -50,6 +51,8 @@ Application::~Application() {
     skybox.reset();
     if (shadowMap) glDeleteTextures(1, &shadowMap);
     if (shadowFramebuffer) glDeleteFramebuffers(1, &shadowFramebuffer);
+    if (secondaryShadowMap) glDeleteTextures(1, &secondaryShadowMap);
+    if (secondaryShadowFramebuffer) glDeleteFramebuffers(1, &secondaryShadowFramebuffer);
     if (window) {
         glfwDestroyWindow(window);
     }
@@ -109,7 +112,7 @@ Notepad::Hit Application::notepadHit(double x, double y) const {
 }
 
 void Application::updateNotepadPointer(double x, double y) {
-    if (notepad) notepad->pointer(notepadHit(x, y), promotionPrefix.empty() && !finished && !dragging &&
+    if (notepad) notepad->pointer(notepadHit(x, y), promotionPrefix.empty() && !dragging &&
         !(ImGui::GetCurrentContext() && ImGui::GetIO().WantCaptureMouse));
 }
 
@@ -118,6 +121,7 @@ void Application::drawNotepadInterface(float dt) {
     updateNotepadPointer(mouseX, mouseY);
     const auto action = notepad->renderInterface(dt, interfaceDifficulty,
         pending.valid() || finished || !promotionPrefix.empty());
+    if (action.close) glfwSetWindowShouldClose(window, GLFW_TRUE);
     if (action.changeDifficulty) setDifficulty(action.difficulty);
     if (action.newGame) {
         try { reset(); }
@@ -311,10 +315,17 @@ void Application::render() {
     if (width < 1 || height < 1) {
         return;
     }
-    const Vec3 lightPosition = scenario.lightPosition;
-    const Mat4 lightViewProjection = scenario.lightViewProjection();
+    frameScenario = scenario.sample(glfwGetTime() - scenarioStart, environmentSeed);
+    const Vec3 lightPosition = frameScenario.lightPosition;
+    const Mat4 lightViewProjection = frameScenario.lightViewProjection();
+    const bool secondaryShadows = frameScenario.animation == Scenario::Animation::BinarySuns ||
+        (frameScenario.animation == Scenario::Animation::Storm && frameScenario.secondaryLightIntensity > 0);
+    Mat4 secondaryProjection;
+    if (secondaryShadows) secondaryProjection = frameScenario.lightViewProjection(true);
 
     // Primeira passagem: somente profundidade, vista pela luz.
+    glActiveTexture(GL_TEXTURE2);
+    glBindTexture(GL_TEXTURE_2D, 0);
     glActiveTexture(GL_TEXTURE0);
     glBindTexture(GL_TEXTURE_2D, 0);
     glViewport(0, 0, shadowResolution, shadowResolution);
@@ -322,6 +333,13 @@ void Application::render() {
     glClear(GL_DEPTH_BUFFER_BIT);
     depthShader->use(lightViewProjection, lightPosition);
     drawScene(*depthShader);
+    if (secondaryShadows) {
+        glViewport(0, 0, shadowResolution / 2, shadowResolution / 2);
+        glBindFramebuffer(GL_FRAMEBUFFER, secondaryShadowFramebuffer);
+        glClear(GL_DEPTH_BUFFER_BIT);
+        depthShader->use(secondaryProjection, frameScenario.secondaryLightPosition);
+        drawScene(*depthShader);
+    }
     glBindFramebuffer(GL_FRAMEBUFFER, 0);
 
     // Segunda passagem: iluminação com consulta ao mapa de sombras.
@@ -329,10 +347,11 @@ void Application::render() {
     glClearColor(.035f, .055f, .075f, 1);
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
     shader->use(perspective(float(width) / height) * lookAt(eye(), cameraTarget), eye());
-    shader->lighting(scenario);
+    shader->lighting(frameScenario);
     shader->shadows(lightViewProjection, lightPosition, shadowMap);
+    if (secondaryShadows) shader->shadows(secondaryProjection, frameScenario.secondaryLightPosition, secondaryShadowMap, true);
     drawScene(*shader);
-    skybox->draw(eye(), cameraTarget, float(width) / height);
+    skybox->draw(eye(), cameraTarget, float(width) / height, frameScenario);
     if (!promotionPrefix.empty()) drawPromotion();
     ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
 }
@@ -448,9 +467,13 @@ int Application::run() {
     glEnable(GL_MULTISAMPLE);
 
     // Recursos graficos e estado inicial da cena.
-    scenario = Scenario::load(scenarioFile);
+    scenario = Scenario::load(scenarioFile.empty() ? Scenario::fileForDifficulty(game.dificuldade()) : scenarioFile);
+    environmentSeed = std::random_device{}();
+    frameScenario = scenario.sample(0, environmentSeed);
     shader = std::make_unique<Shader>();
     initializeShadows();
+    if (scenario.animation == Scenario::Animation::BinarySuns ||
+        scenario.animation == Scenario::Animation::Storm) initializeShadows(true);
     skybox = std::make_unique<Skybox>(scenario.skybox);
     primitives = std::make_unique<Primitives>();
     board = std::make_unique<Board>(*primitives);
@@ -471,6 +494,8 @@ int Application::run() {
     // O backend encadeia os callbacks acima e recebe todos os eventos da interface.
     initializeInterface();
     notepad->initializeInterface();
+    scenarioStart = glfwGetTime();
+    lastFrame = scenarioStart;
     glfwShowWindow(window);
 
     // Loop principal: atualiza o jogo, desenha a cena e processa eventos.
@@ -564,7 +589,7 @@ void Application::drawPromotion() {
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
         glViewport(x, y, w, h);
         shader->use(perspective(float(w) / h) * lookAt(previewEye, {0, .6f, 0}), previewEye);
-        shader->lighting(scenario);
+        shader->lighting(frameScenario);
         promotionPieces[i]->angle = rotation;
         promotionPieces[i]->draw(*shader, Mat4::identity());
     }
@@ -572,11 +597,16 @@ void Application::drawPromotion() {
     glViewport(0, 0, width, height);
 }
 
-void Application::initializeShadows() {
-    depthShader = std::make_unique<Shader>("shadow.vert", "shadow.frag");
-    glGenTextures(1, &shadowMap);
-    glBindTexture(GL_TEXTURE_2D, shadowMap);
-    glTexImage2D(GL_TEXTURE_2D, 0, GL_DEPTH_COMPONENT24, shadowResolution, shadowResolution,
+void Application::initializeShadows(bool secondary) {
+    if (!depthShader) depthShader = std::make_unique<Shader>("shadow.vert", "shadow.frag");
+    auto &map = secondary ? secondaryShadowMap : shadowMap;
+    auto &framebuffer = secondary ? secondaryShadowFramebuffer : shadowFramebuffer;
+    if (map) return;
+    const int resolution = secondary ? shadowResolution / 2 : shadowResolution;
+    glActiveTexture(GL_TEXTURE0);
+    glGenTextures(1, &map);
+    glBindTexture(GL_TEXTURE_2D, map);
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_DEPTH_COMPONENT24, resolution, resolution,
                  0, GL_DEPTH_COMPONENT, GL_FLOAT, nullptr);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
@@ -586,14 +616,19 @@ void Application::initializeShadows() {
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_BORDER);
     const float border[] = {1.f, 1.f, 1.f, 1.f};
     glTexParameterfv(GL_TEXTURE_2D, GL_TEXTURE_BORDER_COLOR, border);
-    glGenFramebuffers(1, &shadowFramebuffer);
-    glBindFramebuffer(GL_FRAMEBUFFER, shadowFramebuffer);
-    glFramebufferTexture2D(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_TEXTURE_2D, shadowMap, 0);
+    glGenFramebuffers(1, &framebuffer);
+    glBindFramebuffer(GL_FRAMEBUFFER, framebuffer);
+    glFramebufferTexture2D(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_TEXTURE_2D, map, 0);
     glDrawBuffer(GL_NONE);
     glReadBuffer(GL_NONE);
     const bool complete = glCheckFramebufferStatus(GL_FRAMEBUFFER) == GL_FRAMEBUFFER_COMPLETE;
     glBindFramebuffer(GL_FRAMEBUFFER, 0);
     glBindTexture(GL_TEXTURE_2D, 0);
+    if (!complete) {
+        glDeleteFramebuffers(1, &framebuffer);
+        glDeleteTextures(1, &map);
+        framebuffer = map = 0;
+    }
     require(complete, "Falha ao criar framebuffer de sombras");
 }
 

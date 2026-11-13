@@ -49,7 +49,7 @@ Skybox::~Skybox() {
     glDeleteTextures(1, &texture);
 }
 
-void Skybox::draw(Vec3 eye, Vec3 target, float aspect) {
+void Skybox::draw(Vec3 eye, Vec3 target, float aspect, const Scenario &scene) {
     const auto forward = normalized(target - eye);
     const auto right = normalized(cross(forward, {0, 1, 0}));
     const auto up = cross(right, forward);
@@ -61,6 +61,7 @@ void Skybox::draw(Vec3 eye, Vec3 target, float aspect) {
     rays.v[4] = y.x; rays.v[5] = y.y; rays.v[6] = y.z;
     rays.v[8] = forward.x; rays.v[9] = forward.y; rays.v[10] = forward.z;
     shader.use(rays, eye);
+    shader.environment(scene);
     glActiveTexture(GL_TEXTURE0);
     glBindTexture(GL_TEXTURE_CUBE_MAP, texture);
     glEnable(GL_TEXTURE_CUBE_MAP_SEAMLESS);

@@ -89,8 +89,6 @@ cmake -S . -B build/cmake
 cmake --build build/cmake --config Release
 ```
 
-O CMake também compila a verificação matemática do bloco de notas. Execute-a com `ctest --test-dir build/cmake -C Release --output-on-failure`.
-
 O executável e seus recursos ficam em `build/cmake/bin/`, inclusive nos geradores com múltiplas configurações. No Windows, execute `./build/cmake/bin/xadrez.exe`; no Linux/macOS, `./build/cmake/bin/xadrez`.
 
 Para MinGW no Windows, use `-G "MinGW Makefiles"` na configuração e mantenha suas ferramentas no `PATH`. Para MSVC, use um ambiente de desenvolvimento do Visual Studio.
@@ -162,7 +160,7 @@ O tempo de pensamento é configurado ao iniciar o executável:
 | `--skill NIVEL` | Inteiro de −20 a 20. Padrão: `0`. |
 | `--time MS` | Inteiro de 1 a 60000, em milissegundos por lance. Padrão: `300`. |
 | `--engine CAMINHO` | Executável do Stockfish. Por padrão, usa `engines/stockfish` ou `engines/stockfish.exe` ao lado do jogo. |
-| `--scenario CAMINHO` | Arquivo de cenário. Padrão: `assets/scenarios/sunset.cfg`. |
+| `--scenario CAMINHO` | Ambiente inicial opcional. Por padrão, o cenário acompanha `--skill` (`1.cfg` a `5.cfg`). |
 | `--trace` | Exibe a comunicação UCI no terminal para diagnóstico. |
 | `--help` | Mostra os argumentos disponíveis e encerra. |
 
@@ -170,9 +168,11 @@ Passe esses argumentos diretamente ao executável. A opção `--run` do script d
 
 ## Cenários e renderização
 
-O cenário padrão está em [assets/scenarios/sunset.cfg](assets/scenarios/sunset.cfg). Ele define a skybox, a posição e a cor da luz, os materiais, a névoa e os parâmetros das sombras.
+Os cenários [1.cfg](assets/scenarios/1.cfg) a [5.cfg](assets/scenarios/5.cfg) acompanham as cinco dificuldades: arco-íris, jardim zen, pôr do sol, planeta com dois sóis e bosque assombrado. A seleção de dificuldade no bloco troca o ambiente sem reiniciar a partida. O padrão Intermediário usa `3.cfg`.
 
-Para criar um cenário, copie esse arquivo, ajuste os valores e compile novamente para copiar os recursos. Depois, selecione a configuração ao executar:
+A configuração [global.cfg](assets/scenarios/global.cfg) centraliza materiais e ajustes de sombras. Cada cenário herda esses valores e define sua própria iluminação, névoa e animação. O planeta tem um sol normal e outro vermelho menor, com movimento, sombras independentes e eclipses. O bosque tem pouca iluminação, névoa e relâmpagos em direções e intervalos variáveis.
+
+Para criar um cenário, copie um arquivo numerado, ajuste os valores e compile novamente para copiar os recursos. Depois, selecione a configuração inicial ao executar:
 
 ```powershell
 ./build/windows/bin/xadrez.exe --scenario assets/scenarios/outro.cfg
@@ -180,7 +180,7 @@ Para criar um cenário, copie esse arquivo, ajuste os valores e compile novament
 
 Os caminhos de cenário são relativos à pasta do executável; caminhos absolutos também são aceitos. Para experimentar sem recompilar, edite a cópia na pasta de saída e reabra o jogo. A próxima compilação sobrescreve essa cópia.
 
-A descrição de cada parâmetro está em [assets/scenarios/README.md](assets/scenarios/README.md). Os shaders ficam em `shaders/`: a cena usa iluminação Blinn–Phong, madeira procedural e sombras em duas passagens, com mapa de profundidade de 4096 × 4096 e suavização PCF 3 × 3.
+A descrição de cada parâmetro está em [assets/scenarios/README.md](assets/scenarios/README.md). Os shaders ficam em `shaders/`: a cena usa iluminação Blinn–Phong, madeira procedural e sombras com mapa principal de 8192 × 8192, mapa adicional de 4096 × 4096 para o sol vermelho e suavização PCF 3 × 3.
 
 ## Organização do código
 
@@ -195,7 +195,6 @@ A descrição de cada parâmetro está em [assets/scenarios/README.md](assets/sc
 | `src/graphics/` | Tabuleiro, mesa, skybox, cenários, malhas, objetos e shaders. |
 | `src/pieces/` | Associação de cada tipo de peça ao modelo e desenho. |
 | `include/` | Cabeçalhos da camada gráfica e operações matemáticas em `Math3D.h`. |
-| `tests/notepad_math.cpp` | Verificação de cliques com rotação, escala e transformações herdadas. |
 | `shaders/` | Programas GLSL da cena, das sombras e da skybox. |
 | `assets/` | Modelos das peças, configurações de cenário e imagens da skybox. |
 | `tools/` | Compilação e preparação dos pacotes do motor. |

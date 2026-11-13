@@ -69,6 +69,10 @@ Shader::~Shader() {
 void Shader::use(const Mat4 &vp, Vec3 eye) {
     glUseProgram(id);
     glUniform1i(glGetUniformLocation(id, "shadowsEnabled"), GL_FALSE);
+    glUniform1i(glGetUniformLocation(id, "secondaryShadowsEnabled"), GL_FALSE);
+    // Samplers of different types must use different units even in inactive branches.
+    glUniform1i(glGetUniformLocation(id, "secondaryShadowMap"), 2);
+    glUniform1i(glGetUniformLocation(id, "pageTexture"), 1);
     glUniformMatrix4fv(glGetUniformLocation(id, "viewProjection"), 1, GL_FALSE, vp.v);
     glUniform3f(glGetUniformLocation(id, "eye"), eye.x, eye.y, eye.z);
 }
@@ -82,9 +86,12 @@ void Shader::lighting(const Scenario &scene) {
     };
     vector("lightPosition", scene.lightPosition);
     vector("lightColor", scene.lightColor);
+    vector("secondaryLightPosition", scene.secondaryLightPosition);
+    vector("secondaryLightColor", scene.secondaryLightColor);
     vector("ambientColor", scene.ambientColor);
     vector("fogColor", scene.fogColor);
     scalar("lightIntensity", scene.lightIntensity);
+    scalar("secondaryLightIntensity", scene.secondaryLightIntensity);
     scalar("ambientStrength", scene.ambientStrength);
     scalar("diffuseStrength", scene.diffuseStrength);
     scalar("specularStrength", scene.specularStrength);
@@ -94,6 +101,18 @@ void Shader::lighting(const Scenario &scene) {
     scalar("shadowBias", scene.shadowBias);
     scalar("shadowMinBias", scene.shadowMinBias);
     scalar("shadowNormalOffset", scene.shadowNormalOffset);
+}
+
+void Shader::environment(const Scenario &scene) {
+    lighting(scene);
+    glUniform1i(glGetUniformLocation(id, "binarySuns"), scene.animation == Scenario::Animation::BinarySuns);
+    glUniform1f(glGetUniformLocation(id, "sunRadius"), scene.sunRadius);
+    glUniform1f(glGetUniformLocation(id, "secondarySunRadius"), scene.secondarySunRadius);
+    glUniform1f(glGetUniformLocation(id, "skyBrightness"), scene.skyBrightness);
+    glUniform1f(glGetUniformLocation(id, "lightningFlash"), scene.lightningFlash);
+    glUniform1f(glGetUniformLocation(id, "lightningSeed"), scene.lightningSeed);
+    glUniform3f(glGetUniformLocation(id, "lightningDirection"), scene.lightningDirection.x,
+        scene.lightningDirection.y, scene.lightningDirection.z);
 }
 
 void Shader::object(const Mat4 &m, Vec3 c, bool wood) {
@@ -119,13 +138,14 @@ void Shader::ruledPaper(Vec2 origin, Vec2 pixelScale) {
                 pixelScale.x, pixelScale.y);
 }
 
-void Shader::shadows(const Mat4 &lightViewProjection, Vec3 lightPosition, GLuint depthMap) {
-    glUniformMatrix4fv(glGetUniformLocation(id, "lightViewProjection"), 1, GL_FALSE,
+void Shader::shadows(const Mat4 &lightViewProjection, Vec3 lightPosition, GLuint depthMap, bool secondary) {
+    glUniformMatrix4fv(glGetUniformLocation(id, secondary ? "secondaryLightViewProjection" : "lightViewProjection"), 1, GL_FALSE,
                        lightViewProjection.v);
-    glUniform3f(glGetUniformLocation(id, "lightPosition"), lightPosition.x, lightPosition.y,
+    glUniform3f(glGetUniformLocation(id, secondary ? "secondaryLightPosition" : "lightPosition"), lightPosition.x, lightPosition.y,
                 lightPosition.z);
-    glUniform1i(glGetUniformLocation(id, "shadowsEnabled"), GL_TRUE);
-    glUniform1i(glGetUniformLocation(id, "shadowMap"), 0);
-    glActiveTexture(GL_TEXTURE0);
+    glUniform1i(glGetUniformLocation(id, secondary ? "secondaryShadowsEnabled" : "shadowsEnabled"), GL_TRUE);
+    glUniform1i(glGetUniformLocation(id, secondary ? "secondaryShadowMap" : "shadowMap"), secondary ? 2 : 0);
+    glActiveTexture(secondary ? GL_TEXTURE2 : GL_TEXTURE0);
     glBindTexture(GL_TEXTURE_2D, depthMap);
+    glActiveTexture(GL_TEXTURE0);
 }

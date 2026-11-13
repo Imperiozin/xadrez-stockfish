@@ -22,7 +22,7 @@ class Notepad : public Object {
     void load();
 
   public:
-    static constexpr int canvasWidth = 768, canvasHeight = 640;
+    static constexpr int canvasWidth = 768, canvasHeight = 1096;
     struct Hit {
         bool body = false, page = false;
         Vec2 pixel;
@@ -30,7 +30,7 @@ class Notepad : public Object {
     };
     struct Action {
         int difficulty = 0;
-        bool changeDifficulty = false, newGame = false;
+        bool changeDifficulty = false, newGame = false, close = false;
     };
 
     Notepad();

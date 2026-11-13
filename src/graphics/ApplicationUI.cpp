@@ -71,7 +71,18 @@ void Application::updateMouseCursor() {
 void Application::setDifficulty(int level) {
     if (pending.valid()) return;
     try {
-        game.definirDificuldade(std::clamp(level, -20, 20));
+        level = std::clamp(level, -20, 20);
+        if (level == interfaceDifficulty) return;
+        auto next = Scenario::load(Scenario::fileForDifficulty(level));
+        auto nextSkybox = std::make_unique<Skybox>(next.skybox);
+        if (next.animation == Scenario::Animation::BinarySuns ||
+            next.animation == Scenario::Animation::Storm) initializeShadows(true);
+        // Commit only after all resources load successfully.
+        game.definirDificuldade(level);
+        scenario = std::move(next);
+        skybox = std::move(nextSkybox);
+        scenarioStart = glfwGetTime();
+        frameScenario = scenario.sample(0, environmentSeed);
         interfaceDifficulty = game.dificuldade();
     } catch (const std::exception &e) {
         status = std::string("Erro ao alterar a dificuldade: ") + e.what();
