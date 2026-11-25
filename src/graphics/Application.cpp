@@ -3,6 +3,7 @@
 #include <assimp/defs.h>
 #undef GLAD_GL_IMPLEMENTATION
 #include "Application.h"
+#include "Candelabrum.h"
 #include "imgui.h"
 #include "imgui_impl_glfw.h"
 #include "imgui_impl_opengl3.h"
@@ -326,7 +327,12 @@ void Application::render() {
     if (width < 1 || height < 1) {
         return;
     }
-    frameScenario = scenario.sample(glfwGetTime() - scenarioStart, environmentSeed);
+    const double scenarioSeconds = glfwGetTime() - scenarioStart;
+    frameScenario = scenario.sample(scenarioSeconds, environmentSeed);
+    const auto identity = Mat4::identity();
+    table->collectLights(frameScenario.localLights, identity, scenarioSeconds);
+    board->collectLights(frameScenario.localLights, identity, scenarioSeconds);
+    pet->collectLights(frameScenario.localLights, table->model(identity), scenarioSeconds);
     const Vec3 lightPosition = frameScenario.lightPosition;
     const Mat4 lightViewProjection = frameScenario.lightViewProjection();
     const bool secondaryShadows = frameScenario.animation == Scenario::Animation::BinarySuns ||
@@ -363,6 +369,9 @@ void Application::render() {
     if (secondaryShadows) shader->shadows(secondaryProjection, frameScenario.secondaryLightPosition, secondaryShadowMap, true);
     drawScene(*shader);
     skybox->draw(eye(), cameraTarget, float(width) / height, frameScenario);
+    // O céu também precede as transparências, pois as chamas não escrevem profundidade.
+    shader->bind();
+    table->drawTransparent(*shader, identity);
     if (!promotionPrefix.empty()) drawPromotion();
     ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
 }
@@ -489,6 +498,9 @@ int Application::run() {
     primitives = std::make_unique<Primitives>();
     board = std::make_unique<Board>(*primitives);
     table = std::make_unique<Table>();
+    auto candelabrum = std::make_unique<Candelabrum>();
+    candelabrum->position = {6.2f, Table::surfaceY, -5.8f};
+    table->addProp(std::move(candelabrum));
     pet = makePet(scenario);
     auto pad = std::make_unique<Notepad>();
     // Único ponto de configuração do bloco: modelo, texto e cliques seguem juntos.

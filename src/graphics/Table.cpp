@@ -6,6 +6,17 @@ void Table::addProp(std::unique_ptr<Object> prop) {
     if (prop) props.push_back(std::move(prop));
 }
 
+void Table::collectLights(std::vector<Light> &result, const Mat4 &parent, double seconds) const {
+    Object::collectLights(result, parent, seconds);
+    const auto tableModel = model(parent);
+    for (const auto &prop : props) prop->collectLights(result, tableModel, seconds);
+}
+
+void Table::drawTransparent(Shader &shader, const Mat4 &parent) {
+    const auto tableModel = model(parent);
+    for (auto &prop : props) prop->drawTransparent(shader, tableModel);
+}
+
 void Table::draw(Shader &shader, const Mat4 &parent) {
     const auto tableModel = model(parent);
     auto timber = [&](Vec3 position, Vec3 size, Vec3 color, float angle = 0.f) {

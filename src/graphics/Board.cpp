@@ -102,6 +102,13 @@ bool Board::isWhite(int s) const {
     return s >= 0 && s < 64 && std::isupper(static_cast<unsigned char>(symbols[s]));
 }
 
+void Board::collectLights(std::vector<Light> &result, const Mat4 &parent, double seconds) const {
+    Object::collectLights(result, parent, seconds);
+    const auto boardModel = model(parent);
+    for (const auto &piece : pieces)
+        if (piece) piece->collectLights(result, boardModel, seconds);
+}
+
 void Board::draw(Shader &s, const Mat4 &parent) {
     auto m = model(parent);
     primitives.draw(s, Primitive::Cube, m, {0, -.38f, 0}, {9.2f, .65f, 9.2f}, {.12f, .065f, .035f});

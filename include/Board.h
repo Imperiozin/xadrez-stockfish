@@ -30,6 +30,7 @@ class Board : public Object {
     bool isAnimating() const { return !motions.empty(); }
     bool isWhite(int square) const;
     void draw(Shader &, const Mat4 &) override;
+    void collectLights(std::vector<Light> &result, const Mat4 &parent, double seconds) const override;
 
     static Vec3 squarePosition(int square) {
         return {float(square % 8) - 3.5f, .035f, 3.5f - float(square / 8)};

@@ -10,8 +10,17 @@ class Object {
     Vec3 position{}, scale{1, 1, 1};
     Vec3 rotation{};
     float angle = 0;
+    std::vector<Light> lights;
     virtual ~Object() = default;
     virtual void draw(Shader &shader, const Mat4 &parent) = 0;
+    virtual void drawTransparent(Shader &, const Mat4 &) {}
+
+    // Coleta antes de desenhar: cada fonte ilumina todos os objetos da cena.
+    virtual void collectLights(std::vector<Light> &result, const Mat4 &parent, double seconds) const {
+        const auto world = model(parent);
+        for (const auto &light : lights)
+            if (light.enabled) result.push_back(light.sample(seconds, world));
+    }
 
     Mat4 model(const Mat4 &parent) const {
         return parent * transform(position, scale, Vec3{rotation.x, rotation.y + angle, rotation.z});

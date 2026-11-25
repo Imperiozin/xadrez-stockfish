@@ -12,4 +12,6 @@ class Table : public Object {
     static constexpr float surfaceY = -.705f;
     void addProp(std::unique_ptr<Object> prop);
     void draw(Shader &shader, const Mat4 &parent) override;
+    void drawTransparent(Shader &shader, const Mat4 &parent) override;
+    void collectLights(std::vector<Light> &result, const Mat4 &parent, double seconds) const override;
 };

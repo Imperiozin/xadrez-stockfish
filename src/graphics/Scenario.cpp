@@ -74,6 +74,32 @@ Scenario Scenario::load(const std::string &file) {
             else if (key == "lightningInterval") values >> scene.lightningInterval;
             else if (key == "lightningJitter") values >> scene.lightningJitter;
             else if (key == "lightningStrength") values >> scene.lightningStrength;
+            else if (key == "clearLocalLights") scene.localLights.clear();
+            else if (key == "pointLight" || key == "spotLight" || key == "candleLight") {
+                Light light;
+                vector(light.position);
+                if (key == "spotLight") {
+                    light.type = Light::Type::Spot;
+                    vector(light.direction);
+                }
+                vector(light.color);
+                values >> light.intensity >> light.range;
+                if (key == "spotLight") values >> light.innerAngle >> light.outerAngle;
+                if (key == "candleLight") values >> light.flickerAmount >> light.flickerSpeed;
+                light.flickerPhase = float(scene.localLights.size()) * 2.39996f;
+                if (values) {
+                    try {
+                        light.validate();
+                    } catch (const std::exception &error) {
+                        throw std::runtime_error(std::string(error.what()) + " em " + path.string() + ":" +
+                                                 std::to_string(number));
+                    }
+                    if (scene.localLights.size() >= Light::maxCount)
+                        throw std::runtime_error("Limite de 16 luzes locais excedido em " + path.string() + ":" +
+                                                 std::to_string(number));
+                    scene.localLights.push_back(light);
+                }
+            }
             else if (key == "animation") {
                 std::string mode;
                 values >> mode;
@@ -178,6 +204,7 @@ Scenario Scenario::sample(double seconds, std::uint32_t seed) const {
         frame.ambientStrength += .20f*frame.lightningFlash;
         frame.fogColor = fogColor + Vec3{.16f, .20f, .28f}*frame.lightningFlash;
     }
+    for (auto &light : frame.localLights) light = light.sample(seconds);
     return frame;
 }
 

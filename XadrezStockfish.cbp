@@ -309,6 +309,9 @@
         <Unit filename="include/Board.h" />
         <Unit filename="include/King.h" />
         <Unit filename="include/Knight.h" />
+        <Unit filename="include/Light.h" />
+        <Unit filename="include/Candelabrum.h" />
+        <Unit filename="src/graphics/Candelabrum.cpp" />
         <Unit filename="include/Math3D.h" />
         <Unit filename="include/Mesh.h" />
         <Unit filename="include/Object.h" />

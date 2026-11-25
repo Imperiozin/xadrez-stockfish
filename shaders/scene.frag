@@ -45,6 +45,54 @@ uniform mat4 secondaryLightViewProjection;
 uniform sampler2DShadow secondaryShadowMap;
 uniform bool secondaryShadowsEnabled;
 
+const int MAX_LOCAL_LIGHTS = 16;
+struct LocalLight {
+    int type; // 0: pontual; 1: cone.
+    vec3 position;
+    vec3 direction;
+    vec3 color;
+    float intensity;
+    float range;
+    float innerCos;
+    float outerCos;
+};
+uniform int localLightCount;
+uniform LocalLight localLights[MAX_LOCAL_LIGHTS];
+uniform vec3 emissionColor;
+uniform bool texturedEmission;
+
+// Uma única resposta de material para todas as fontes (Blinn-Phong).
+vec3 directLighting(vec3 normal, vec3 viewDirection, vec3 lightDirection,
+                    vec3 materialColor, vec3 radiance) {
+    float diffuse = max(dot(normal, lightDirection), 0.0);
+    vec3 halfway = lightDirection + viewDirection;
+    halfway *= inversesqrt(max(dot(halfway, halfway), 0.00000001));
+    float specular = diffuse > 0.0 ? pow(max(dot(normal, halfway), 0.0), shininess) : 0.0;
+    return radiance * (materialColor * diffuseStrength * diffuse
+        + vec3(woodMaterial ? woodSpecularStrength : specularStrength) * specular);
+}
+
+vec3 localLighting(LocalLight light, vec3 normal, vec3 viewDirection, vec3 materialColor) {
+    vec3 offset = light.position - worldPosition;
+    float distanceSquared = dot(offset, offset);
+    float relativeDistance = sqrt(distanceSquared) / light.range;
+    if (relativeDistance >= 1.0 || light.intensity <= 0.0) return vec3(0.0);
+    vec3 direction = offset * inversesqrt(max(distanceSquared, 0.00000001));
+
+    // Queda com a distância, sem singularidade na origem nem corte brusco no alcance.
+    float fade = 1.0 - relativeDistance * relativeDistance;
+    float attenuation = fade * fade / (1.0 + distanceSquared);
+    if (light.type == 1) {
+        float angleCos = dot(-direction, light.direction);
+        // Cones muito estreitos podem ter cossenos iguais na precisão da GPU.
+        attenuation *= light.innerCos > light.outerCos
+            ? smoothstep(light.outerCos, light.innerCos, angleCos)
+            : step(light.outerCos, angleCos);
+    }
+    return directLighting(normal, viewDirection, direction, materialColor,
+                          light.color * light.intensity * attenuation);
+}
+
 float shadowAmount(vec3 normal, vec3 lightDirection, vec4 lightSpace,
                    sampler2DShadow depthMap, bool enabled) {
     if (!enabled || lightSpace.w <= 0.0) return 0.0;
@@ -81,11 +129,6 @@ void main() {
     vec3 lightDirection = normalize(lightPosition - worldPosition);
     vec3 eyeOffset = eye - worldPosition;
     vec3 viewDirection = normalize(eyeOffset);
-    vec3 halfwayDirection = normalize(lightDirection + viewDirection);
-
-    // Iluminacao ambiente, difusa e especular (Blinn-Phong).
-    float diffuse = max(dot(normal, lightDirection), 0.0);
-    float specular = diffuse > 0.0 ? pow(max(dot(normal, halfwayDirection), 0.0), shininess) : 0.0;
     float visibility = 1.0 - shadowAmount(normal, lightDirection, lightSpacePosition, shadowMap, shadowsEnabled);
     vec3 materialColor = color;
     if (modelTextureEnabled) materialColor *= texture(modelTexture, modelUv).rgb;
@@ -122,25 +165,30 @@ void main() {
                               + .025 * fineGrain * exp(-filterWidth * 420.0);
     }
     vec3 litColor = materialColor * ambientColor * ambientStrength
-                  + visibility * lightColor * lightIntensity
-                  * (materialColor * diffuseStrength * diffuse
-                  + vec3(woodMaterial ? woodSpecularStrength : specularStrength) * specular);
+        + directLighting(normal, viewDirection, lightDirection, materialColor,
+                         visibility * lightColor * lightIntensity);
 
     if (secondaryLightIntensity > 0.0) {
         vec3 secondaryDirection = normalize(secondaryLightPosition - worldPosition);
-        float secondaryDiffuse = max(dot(normal, secondaryDirection), 0.0);
-        float secondarySpecular = secondaryDiffuse > 0.0
-            ? pow(max(dot(normal, normalize(secondaryDirection + viewDirection)), 0.0), shininess) : 0.0;
         vec4 secondarySpace = secondaryLightViewProjection * vec4(worldPosition + normal * shadowNormalOffset, 1.0);
         float secondaryVisibility = 1.0 - shadowAmount(normal, secondaryDirection,
             secondarySpace, secondaryShadowMap, secondaryShadowsEnabled);
-        litColor += secondaryVisibility * secondaryLightColor * secondaryLightIntensity
-            * (materialColor * diffuseStrength * secondaryDiffuse
-            + vec3(woodMaterial ? woodSpecularStrength : specularStrength) * secondarySpecular);
+        litColor += directLighting(normal, viewDirection, secondaryDirection, materialColor,
+                                  secondaryVisibility * secondaryLightColor * secondaryLightIntensity);
     }
 
-    // A nevoa aumenta com o quadrado da distancia ate a camera.
+    for (int i = 0; i < localLightCount; ++i)
+        litColor += localLighting(localLights[i], normal, viewDirection, materialColor);
+    litColor += emissionColor;
+
+    // A névoa aumenta com o quadrado da distância até a câmera.
     float distanceSquared = dot(eyeOffset, eyeOffset);
     float fog = 1.0 - exp(-fogDensity * distanceSquared);
-    pixel = vec4(mix(litColor, fogColor, fog), 1.0);
+    // Nas chamas, o preto da textura permanece transparente na composição aditiva.
+    if (texturedEmission) {
+        vec4 flame = texture(modelTexture, modelUv);
+        pixel = vec4(flame.rgb * color * emissionColor * (1.0 - fog), flame.a);
+    } else {
+        pixel = vec4(mix(litColor, fogColor, fog), 1.0);
+    }
 }

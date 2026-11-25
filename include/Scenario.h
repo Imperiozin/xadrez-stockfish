@@ -1,7 +1,9 @@
 #pragma once
 #include "Math3D.h"
+#include "Light.h"
 #include <cstdint>
 #include <string>
+#include <vector>
 
 struct Scenario {
     enum class Animation { Static, BinarySuns, Storm };
@@ -26,6 +28,7 @@ struct Scenario {
     // Sampled animation state, never read from configuration files.
     float lightningFlash = 0, lightningSeed = 0;
     Vec3 lightningDirection{0, .6f, 1};
+    std::vector<Light> localLights;
 
     static Scenario load(const std::string &file);
     static std::string fileForDifficulty(int level);
