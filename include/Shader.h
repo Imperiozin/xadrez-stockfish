@@ -23,6 +23,7 @@ class Shader {
     void localLights(const std::vector<Light> &lights);
     void environment(const Scenario &scenario);
     void shadows(const Mat4 &lightViewProjection, Vec3 lightPosition, GLuint depthMap, bool secondary = false);
+    void localShadows(GLuint depthArray);
     void object(const Mat4 &model, Vec3 color, bool wood = false);
     bool emission(Vec3 radiance, bool textured = false);
     void pageTexture(GLuint texture, float height, GLuint surfaceTexture);

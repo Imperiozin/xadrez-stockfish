@@ -115,14 +115,6 @@ void Application::drawInterface() {
         }
     };
 
-    ImGui::SetNextWindowPos(ImVec2(12, io.DisplaySize.y - 12), ImGuiCond_Always, ImVec2(0, 1));
-    ImGui::SetNextWindowSize(ImVec2(std::max(1.f, std::min(600.f, io.DisplaySize.x - 24)), 0));
-    ImGui::Begin("Estado da partida###status", nullptr, flags | ImGuiWindowFlags_NoInputs);
-    ImGui::PushTextWrapPos(0);
-    ImGui::TextUnformatted(status.c_str());
-    ImGui::PopTextWrapPos();
-    ImGui::End();
-
     if (!finished || board->isAnimating()) return;
 
     ImGui::SetNextWindowPos(ImVec2(io.DisplaySize.x * .5f, io.DisplaySize.y * .5f),

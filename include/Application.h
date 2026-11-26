@@ -10,6 +10,8 @@
 #include <GLFW/glfw3.h>
 #include <future>
 
+class Candelabrum;
+
 class Application {
     Jogo &game;
     std::string scenarioFile;
@@ -22,6 +24,17 @@ class Application {
     std::unique_ptr<Skybox> skybox;
     GLuint shadowFramebuffer = 0, shadowMap = 0;
     GLuint secondaryShadowFramebuffer = 0, secondaryShadowMap = 0;
+    GLuint localShadowFramebuffer = 0, localShadowMap = 0;
+    static constexpr int localShadowResolution = 512;
+    int localShadowCount = 0;
+    std::vector<Light> localShadowLights;
+    GLuint localStaticShadowMap = 0, localStaticShadowFramebuffer = 0;
+    std::string localShadowState, localStaticShadowState;
+    std::string primaryShadowState, secondaryShadowState;
+    std::string shadowGeometryState() const;
+    std::string staticShadowGeometryState() const;
+    void drawDynamicShadowScene(Shader &sceneShader);
+    void renderLocalShadows();
     static constexpr int shadowResolution = 8192;
     void initializeShadows(bool secondary = false);
     void drawScene(Shader &sceneShader);
@@ -29,6 +42,12 @@ class Application {
     std::unique_ptr<Board> board;
     std::unique_ptr<Table> table;
     std::unique_ptr<Pet> pet;
+    Candelabrum *candelabrum = nullptr; // Owned by the table.
+    bool movingCandelabrum = false;
+    void toggleCandelabrumMode();
+    void moveCandelabrum(float dt);
+    void drawCandelabrumArm(Shader &sceneShader);
+    bool petEnabled = false;
     AvaliacaoJogada lastReview;
     ResultadoPartida lastOutcome = ResultadoPartida::EmAndamento;
     std::unique_ptr<Pet> makePet(const Scenario &scene);

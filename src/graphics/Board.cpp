@@ -4,6 +4,7 @@
 #include <stdexcept>
 
 void Board::sync(const std::string &fen) {
+    ++geometryVersion;
     std::array<char, 64> next{};
     int rank = 7, file = 0;
     for (char c : fen) {
@@ -69,6 +70,7 @@ void Board::animateMove(const std::string &move, const std::string &fen) {
 }
 
 void Board::update(float dt) {
+    if (isAnimating() && dt > 0) ++geometryVersion;
     dt = std::max(0.f, dt);
     const float blend = 1.f - std::exp(-18.f * dt);
     for (int i = 0; i < 64; ++i) {
@@ -76,8 +78,10 @@ void Board::update(float dt) {
             [i](const PieceMotion &motion) { return motion.from == i; })) continue;
         const float target = squarePosition(i).y + (i == selected ? .45f : 0.f);
         auto &height = pieces[i]->position.y;
+        const float previousHeight = height;
         height += (target - height) * blend;
         if (std::abs(target - height) < .0001f) height = target;
+        if (height != previousHeight) ++geometryVersion;
     }
 
     if (isAnimating()) {

@@ -27,6 +27,7 @@ struct Pet::Impl {
     AnimatedModel model;
     Mesh body;
     GLuint texture = 0;
+    std::uint64_t geometryVersion = 0;
     std::string clip = "idle";
     std::string tourClip = "idle";
     double time = 0, remaining = 0, tourTime = 0;
@@ -132,6 +133,12 @@ void Pet::update(float dt) {
             vertices[i].normal = normalized(m.previous[i].normal*(1-t) + vertices[i].normal*t);
         }
     }
+    bool changed = vertices.size() != m.pose.size();
+    for (std::size_t i = 0; !changed && i < vertices.size(); ++i) {
+        const auto delta = vertices[i].position - m.pose[i].position;
+        changed = dot(delta, delta) != 0;
+    }
+    if (changed) ++m.geometryVersion;
     m.body.update(vertices);
     m.pose = std::move(vertices);
 }
@@ -173,6 +180,7 @@ void Pet::reset() {
     impl->pose = impl->model.vertices();
     impl->previous.clear();
     impl->transition = 1;
+    ++impl->geometryVersion;
     impl->body.update(impl->pose);
 }
 
@@ -182,3 +190,5 @@ void Pet::draw(Shader &shader, const Mat4 &parent) {
     shader.modelTexture(impl->texture);
     impl->body.draw();
 }
+
+std::uint64_t Pet::shadowRevision() const { return impl->geometryVersion; }

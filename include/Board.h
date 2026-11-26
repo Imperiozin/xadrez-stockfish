@@ -6,6 +6,7 @@
 
 class Board : public Object {
     Primitives &primitives;
+    std::uint64_t geometryVersion = 0;
     std::array<std::unique_ptr<Piece>, 64> pieces;
     std::array<char, 64> symbols{};
     struct PieceMotion {
@@ -27,6 +28,7 @@ class Board : public Object {
     void sync(const std::string &fen);
     void animateMove(const std::string &move, const std::string &fen);
     void update(float dt);
+    std::uint64_t shadowRevision() const { return geometryVersion; }
     bool isAnimating() const { return !motions.empty(); }
     bool isWhite(int square) const;
     void draw(Shader &, const Mat4 &) override;

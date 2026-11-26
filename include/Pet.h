@@ -12,6 +12,7 @@ class Pet : public Object {
     explicit Pet(const std::string &name, const Pet *previous = nullptr);
     ~Pet() override;
     void update(float dt);
+    std::uint64_t shadowRevision() const;
     void review(const AvaliacaoJogada &evaluation);
     void thinking();
     void finish(ResultadoPartida result);

@@ -51,6 +51,10 @@ Application::~Application() {
     shader.reset();
     depthShader.reset();
     skybox.reset();
+    if (localStaticShadowMap) glDeleteTextures(1, &localStaticShadowMap);
+    if (localStaticShadowFramebuffer) glDeleteFramebuffers(1, &localStaticShadowFramebuffer);
+    if (localShadowMap) glDeleteTextures(1, &localShadowMap);
+    if (localShadowFramebuffer) glDeleteFramebuffers(1, &localShadowFramebuffer);
     if (shadowMap) glDeleteTextures(1, &shadowMap);
     if (shadowFramebuffer) glDeleteFramebuffers(1, &shadowFramebuffer);
     if (secondaryShadowMap) glDeleteTextures(1, &secondaryShadowMap);
@@ -122,7 +126,9 @@ void Application::drawNotepadInterface(float dt) {
     if (!notepad) return;
     updateNotepadPointer(mouseX, mouseY);
     const auto action = notepad->renderInterface(dt, interfaceDifficulty,
-        pending.valid() || finished || !promotionPrefix.empty());
+        pending.valid() || finished || !promotionPrefix.empty(), petEnabled, movingCandelabrum);
+    if (action.toggleCandelabrum) toggleCandelabrumMode();
+    if (action.togglePet) petEnabled = !petEnabled;
     if (action.close) glfwSetWindowShouldClose(window, GLFW_TRUE);
     if (action.changeDifficulty) setDifficulty(action.difficulty);
     if (action.newGame) {
@@ -286,6 +292,10 @@ void Application::reset() {
 }
 
 void Application::key(int k) {
+    if (k == GLFW_KEY_L) {
+        toggleCandelabrumMode();
+        return;
+    }
     if (k == GLFW_KEY_ESCAPE) {
         if (!promotionPrefix.empty()) {
             cancelSelection();
@@ -332,7 +342,7 @@ void Application::render() {
     const auto identity = Mat4::identity();
     table->collectLights(frameScenario.localLights, identity, scenarioSeconds);
     board->collectLights(frameScenario.localLights, identity, scenarioSeconds);
-    pet->collectLights(frameScenario.localLights, table->model(identity), scenarioSeconds);
+    if (petEnabled) pet->collectLights(frameScenario.localLights, table->model(identity), scenarioSeconds);
     const Vec3 lightPosition = frameScenario.lightPosition;
     const Mat4 lightViewProjection = frameScenario.lightViewProjection();
     const bool secondaryShadows = frameScenario.animation == Scenario::Animation::BinarySuns ||
@@ -345,18 +355,26 @@ void Application::render() {
     glBindTexture(GL_TEXTURE_2D, 0);
     glActiveTexture(GL_TEXTURE0);
     glBindTexture(GL_TEXTURE_2D, 0);
-    glViewport(0, 0, shadowResolution, shadowResolution);
-    glBindFramebuffer(GL_FRAMEBUFFER, shadowFramebuffer);
-    glClear(GL_DEPTH_BUFFER_BIT);
-    depthShader->use(lightViewProjection, lightPosition);
-    drawScene(*depthShader);
-    if (secondaryShadows) {
-        glViewport(0, 0, shadowResolution / 2, shadowResolution / 2);
-        glBindFramebuffer(GL_FRAMEBUFFER, secondaryShadowFramebuffer);
+    const auto geometry = shadowGeometryState();
+    auto renderGlobalShadow = [&](GLuint framebuffer, int resolution, const Mat4 &projection,
+                                  Vec3 position, std::string &previous) {
+        auto state = geometry;
+        state.append(reinterpret_cast<const char *>(projection.v), sizeof(projection.v));
+        if (state == previous) return;
+        glViewport(0, 0, resolution, resolution);
+        glBindFramebuffer(GL_FRAMEBUFFER, framebuffer);
         glClear(GL_DEPTH_BUFFER_BIT);
-        depthShader->use(secondaryProjection, frameScenario.secondaryLightPosition);
+        depthShader->use(projection, position);
         drawScene(*depthShader);
+        previous = std::move(state);
+    };
+    renderGlobalShadow(shadowFramebuffer, shadowResolution, lightViewProjection,
+                       lightPosition, primaryShadowState);
+    if (secondaryShadows) {
+        renderGlobalShadow(secondaryShadowFramebuffer, shadowResolution / 2, secondaryProjection,
+                           frameScenario.secondaryLightPosition, secondaryShadowState);
     }
+    renderLocalShadows();
     glBindFramebuffer(GL_FRAMEBUFFER, 0);
 
     // Segunda passagem: iluminação com consulta ao mapa de sombras.
@@ -365,6 +383,7 @@ void Application::render() {
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
     shader->use(perspective(float(width) / height) * lookAt(eye(), cameraTarget), eye());
     shader->lighting(frameScenario);
+    shader->localShadows(localShadowMap);
     shader->shadows(lightViewProjection, lightPosition, shadowMap);
     if (secondaryShadows) shader->shadows(secondaryProjection, frameScenario.secondaryLightPosition, secondaryShadowMap, true);
     drawScene(*shader);
@@ -448,7 +467,7 @@ void Application::initializeInput() {
 
     glfwSetKeyCallback(window, [](GLFWwindow *w, int key, int, int action, int) {
         if (ImGui::GetCurrentContext() && ImGui::GetIO().WantCaptureKeyboard) return;
-        if (action == GLFW_PRESS || action == GLFW_REPEAT) {
+        if (action == GLFW_PRESS || (action == GLFW_REPEAT && key != GLFW_KEY_L)) {
             static_cast<Application *>(glfwGetWindowUserPointer(w))->key(key);
         }
     });
@@ -498,9 +517,10 @@ int Application::run() {
     primitives = std::make_unique<Primitives>();
     board = std::make_unique<Board>(*primitives);
     table = std::make_unique<Table>();
-    auto candelabrum = std::make_unique<Candelabrum>();
-    candelabrum->position = {6.2f, Table::surfaceY, -5.8f};
-    table->addProp(std::move(candelabrum));
+    auto candle = std::make_unique<Candelabrum>();
+    candle->position = {6.2f, Table::surfaceY, -5.8f};
+    candelabrum = candle.get();
+    table->addProp(std::move(candle));
     pet = makePet(scenario);
     auto pad = std::make_unique<Notepad>();
     // Único ponto de configuração do bloco: modelo, texto e cliques seguem juntos.
@@ -535,6 +555,7 @@ int Application::run() {
         ImGui_ImplGlfw_NewFrame();
         ImGui::NewFrame();
         moveCamera(dt);
+        moveCandelabrum(dt);
         drawNotepadInterface(dt);
         drawInterface();
         updateMouseCursor();
@@ -661,9 +682,210 @@ void Application::drawScene(Shader &sceneShader) {
     const auto identity = Mat4::identity();
     table->draw(sceneShader, identity);
     board->draw(sceneShader, identity);
-    pet->draw(sceneShader, table->model(identity));
+    if (petEnabled) pet->draw(sceneShader, table->model(identity));
+    if (movingCandelabrum) drawCandelabrumArm(sceneShader);
 }
 
 std::unique_ptr<Pet> Application::makePet(const Scenario &scene) {
     return std::make_unique<Pet>(scene.pet, pet.get());
+}
+
+void Application::toggleCandelabrumMode() {
+    if (!candelabrum) return;
+    movingCandelabrum = !movingCandelabrum;
+    if (movingCandelabrum) cancelSelection();
+}
+
+void Application::moveCandelabrum(float dt) {
+    if (!movingCandelabrum || !candelabrum ||
+        !glfwGetWindowAttrib(window, GLFW_FOCUSED) || ImGui::GetIO().WantCaptureKeyboard) return;
+    auto pressed = [this](int key) { return glfwGetKey(window, key) == GLFW_PRESS; };
+    const float horizontal = float(pressed(GLFW_KEY_D)) - float(pressed(GLFW_KEY_A));
+    const float vertical = float(pressed(GLFW_KEY_W)) - float(pressed(GLFW_KEY_S));
+    const Vec3 right{std::cos(yaw), 0, -std::sin(yaw)};
+    const Vec3 forward{-std::sin(yaw), 0, -std::cos(yaw)};
+    Vec3 movement = right * horizontal;
+    if (pressed(GLFW_KEY_LEFT_SHIFT) || pressed(GLFW_KEY_RIGHT_SHIFT)) movement.y = vertical;
+    else movement = movement + forward * vertical;
+    if (dot(movement, movement) == 0) return;
+    auto &position = candelabrum->position;
+    position = position + normalized(movement) * (dt * 4.f);
+    // Mantém a base sobre a mesa, permitindo levantar e pousar o conjunto.
+    position.x = std::clamp(position.x, -Table::width / 2 + .8f, Table::width / 2 - .8f);
+    position.z = std::clamp(position.z, -Table::depth / 2 + .8f, Table::depth / 2 - .8f);
+    position.y = std::clamp(position.y, Table::surfaceY, Table::surfaceY + 8.f);
+}
+
+void Application::drawCandelabrumArm(Shader &sceneShader) {
+    if (!candelabrum) return;
+    const auto parent = Mat4::identity();
+    const Vec3 cameraEye = eye();
+    const Vec3 forward = normalized(cameraTarget - cameraEye);
+    const Vec3 right = normalized(cross(forward, {0, 1, 0}));
+    const Vec3 up = cross(right, forward);
+    const Vec3 hand = transformPoint(candelabrum->model(table->model(parent)), {0, 1.35f, 0});
+    // Camera-relative shoulder: the arm enters from the lower-right corner of the POV.
+    const Vec3 shoulder = cameraEye + forward * 1.8f + right * .8f - up * 1.0f;
+    const Vec3 elbow = shoulder + (hand - shoulder) * .45f + right * .75f - up * .45f;
+    auto segment = [&](Vec3 from, Vec3 to, float radius, Vec3 color) {
+        const Vec3 delta = to - from;
+        const float length = std::sqrt(dot(delta, delta));
+        const Vec3 direction = delta * (1.f / length);
+        const Vec3 reference = std::abs(direction.y) > .95f ? Vec3{1, 0, 0} : Vec3{0, 1, 0};
+        const Vec3 side = normalized(cross(direction, reference));
+        const Vec3 front = cross(side, direction);
+        Mat4 basis = Mat4::identity();
+        basis.v[0] = side.x; basis.v[1] = side.y; basis.v[2] = side.z;
+        basis.v[4] = direction.x; basis.v[5] = direction.y; basis.v[6] = direction.z;
+        basis.v[8] = front.x; basis.v[9] = front.y; basis.v[10] = front.z;
+        basis.v[12] = from.x; basis.v[13] = from.y; basis.v[14] = from.z;
+        primitives->draw(sceneShader, Primitive::Cylinder, parent * basis, {},
+            {radius, length, radius}, color);
+    };
+    segment(shoulder, elbow, .26f, {.20f, .35f, .46f});
+    segment(elbow, hand, .22f, {.25f, .43f, .55f});
+    primitives->draw(sceneShader, Primitive::Sphere, parent, hand,
+        {.38f, .38f, .38f}, {.88f, .68f, .46f});
+}
+
+std::string Application::staticShadowGeometryState() const {
+    std::string state;
+    auto appendModel = [&](const Object *object, const Mat4 &parent) {
+        if (!object) return;
+        const auto matrix = object->model(parent);
+        state.append(reinterpret_cast<const char *>(matrix.v), sizeof(matrix.v));
+    };
+    const auto identity = Mat4::identity();
+    appendModel(table.get(), identity);
+    appendModel(candelabrum, table->model(identity));
+    appendModel(notepad, table->model(identity));
+    return state;
+}
+
+std::string Application::shadowGeometryState() const {
+    auto state = staticShadowGeometryState();
+    auto append = [&](const auto &value) {
+        state.append(reinterpret_cast<const char *>(&value), sizeof(value));
+    };
+    append(board->shadowRevision());
+    append(board->selected);
+    append(board->model(Mat4::identity()));
+    for (const auto *markers : {&board->captures, &board->castling, &board->destinations}) {
+        append(markers->size());
+        for (int square : *markers) append(square);
+    }
+    append(petEnabled);
+    if (petEnabled) {
+        append(pet->shadowRevision());
+        append(pet->model(table->model(Mat4::identity())));
+        state += scenario.pet;
+    }
+    append(movingCandelabrum);
+    if (movingCandelabrum) {
+        append(eye());
+        append(cameraTarget);
+    }
+    return state;
+}
+
+void Application::drawDynamicShadowScene(Shader &sceneShader) {
+    const auto identity = Mat4::identity();
+    board->draw(sceneShader, identity);
+    if (petEnabled) pet->draw(sceneShader, table->model(identity));
+    if (movingCandelabrum) drawCandelabrumArm(sceneShader);
+}
+
+void Application::renderLocalShadows() {
+    std::vector<Light> active;
+    for (const auto &light : frameScenario.localLights) {
+        if (!light.enabled) continue;
+        light.validate();
+        active.push_back(light);
+    }
+    require(active.size() <= Light::maxCount, "Too many local lights for shadow maps");
+    const int count = static_cast<int>(active.size());
+    if (!count) return;
+    const auto geometry = shadowGeometryState();
+    const auto staticGeometry = staticShadowGeometryState();
+    const bool reallocate = count != localShadowCount;
+    const bool dynamicChanged = geometry != localShadowState;
+    const bool staticChanged = reallocate || staticGeometry != localStaticShadowState;
+    std::vector<bool> dirty(count), staticDirty(count);
+    bool anyDirty = false;
+    for (int i = 0; i < count; ++i) {
+        bool sourceChanged = reallocate || i >= static_cast<int>(localShadowLights.size());
+        if (!sourceChanged) {
+            const auto delta = active[i].position - localShadowLights[i].position;
+            sourceChanged = dot(delta, delta) != 0 || active[i].range != localShadowLights[i].range;
+        }
+        staticDirty[i] = staticChanged || sourceChanged;
+        dirty[i] = staticDirty[i] || dynamicChanged;
+        anyDirty = anyDirty || dirty[i];
+    }
+    if (!anyDirty) return;
+
+    glActiveTexture(GL_TEXTURE5);
+    glBindTexture(GL_TEXTURE_2D_ARRAY, 0);
+    if (!localShadowMap) {
+        glGenTextures(1, &localShadowMap);
+        glGenFramebuffers(1, &localShadowFramebuffer);
+        glGenTextures(1, &localStaticShadowMap);
+        glGenFramebuffers(1, &localStaticShadowFramebuffer);
+    }
+    if (reallocate) {
+        for (auto map : {localShadowMap, localStaticShadowMap}) {
+            glBindTexture(GL_TEXTURE_2D_ARRAY, map);
+            glTexImage3D(GL_TEXTURE_2D_ARRAY, 0, GL_DEPTH_COMPONENT24,
+                localShadowResolution, localShadowResolution, count * 6, 0,
+                GL_DEPTH_COMPONENT, GL_FLOAT, nullptr);
+            glTexParameteri(GL_TEXTURE_2D_ARRAY, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+            glTexParameteri(GL_TEXTURE_2D_ARRAY, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+            glTexParameteri(GL_TEXTURE_2D_ARRAY, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+            glTexParameteri(GL_TEXTURE_2D_ARRAY, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+            glTexParameteri(GL_TEXTURE_2D_ARRAY, GL_TEXTURE_COMPARE_MODE, GL_COMPARE_REF_TO_TEXTURE);
+            glTexParameteri(GL_TEXTURE_2D_ARRAY, GL_TEXTURE_COMPARE_FUNC, GL_LEQUAL);
+        }
+        glBindTexture(GL_TEXTURE_2D_ARRAY, 0);
+        localShadowCount = count;
+    }
+    glActiveTexture(GL_TEXTURE0);
+    glViewport(0, 0, localShadowResolution, localShadowResolution);
+    const Vec3 directions[] = {{1,0,0}, {-1,0,0}, {0,1,0}, {0,-1,0}, {0,0,1}, {0,0,-1}};
+    const Vec3 ups[] = {{0,-1,0}, {0,-1,0}, {0,0,1}, {0,0,-1}, {0,-1,0}, {0,-1,0}};
+    auto attach = [&](GLenum target, GLuint framebuffer, GLuint map, int layer) {
+        glBindFramebuffer(target, framebuffer);
+        glFramebufferTextureLayer(target, GL_DEPTH_ATTACHMENT, map, 0, layer);
+        if (target != GL_READ_FRAMEBUFFER) glDrawBuffer(GL_NONE);
+        if (target != GL_DRAW_FRAMEBUFFER) glReadBuffer(GL_NONE);
+        require(glCheckFramebufferStatus(target) == GL_FRAMEBUFFER_COMPLETE,
+            "Failed to create local light shadow framebuffer");
+    };
+    for (int i = 0; i < count; ++i) {
+        if (!dirty[i]) continue;
+        const auto &light = active[i];
+        const float farPlane = light.range;
+        const float nearPlane = std::min(.05f, farPlane * .01f);
+        Mat4 projection{};
+        projection.v[0] = projection.v[5] = 1;
+        projection.v[10] = -(farPlane + nearPlane) / (farPlane - nearPlane);
+        projection.v[11] = -1;
+        projection.v[14] = -2 * farPlane * nearPlane / (farPlane - nearPlane);
+        for (int face = 0; face < 6; ++face) {
+            const int layer = i * 6 + face;
+            depthShader->use(projection * lookAt(light.position, light.position + directions[face], ups[face]), light.position);
+            if (staticDirty[i]) {
+                attach(GL_FRAMEBUFFER, localStaticShadowFramebuffer, localStaticShadowMap, layer);
+                glClear(GL_DEPTH_BUFFER_BIT);
+                table->draw(*depthShader, Mat4::identity());
+            }
+            attach(GL_READ_FRAMEBUFFER, localStaticShadowFramebuffer, localStaticShadowMap, layer);
+            attach(GL_DRAW_FRAMEBUFFER, localShadowFramebuffer, localShadowMap, layer);
+            glBlitFramebuffer(0, 0, localShadowResolution, localShadowResolution,
+                0, 0, localShadowResolution, localShadowResolution, GL_DEPTH_BUFFER_BIT, GL_NEAREST);
+            drawDynamicShadowScene(*depthShader);
+        }
+    }
+    localShadowLights = std::move(active);
+    localShadowState = geometry;
+    localStaticShadowState = staticGeometry;
 }

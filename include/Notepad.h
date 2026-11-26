@@ -30,13 +30,13 @@ class Notepad : public Object {
     };
     struct Action {
         int difficulty = 0;
-        bool changeDifficulty = false, newGame = false, close = false;
+        bool changeDifficulty = false, newGame = false, togglePet = false, toggleCandelabrum = false, close = false;
     };
 
     Notepad();
     ~Notepad() override;
     void initializeInterface();
-    Action renderInterface(float dt, int difficulty, bool disabled);
+    Action renderInterface(float dt, int difficulty, bool disabled, bool petEnabled, bool movingCandelabrum);
     void pointer(const Hit &hit, bool enabled);
     void mouseButton(bool down);
     void focus(bool focused);

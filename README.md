@@ -277,3 +277,32 @@ O código próprio está sob a [licença MIT](LICENSE). As dependências mantêm
 - [chess-library](vendor/chess-library/LICENSE).
 - [ghc-filesystem](vendor/ghc-filesystem/LICENSE).
 - Stockfish: GPLv3, com fontes e `Copying.txt` em cada pacote de `vendor/stockfish/`.
+
+### Movimentar o candelabro
+
+Pressione **L** ou selecione **Habilitar braço (L)** no bloco de notas para
+mostrar um braço com dois cilindros e uma mão esférica segurando a haste.
+Use **WASD** para mover o conjunto na mesa, na orientação da câmera, e
+**Shift + W/S** para subir ou descer. A base permanece dentro da mesa e pode
+ser elevada até oito unidades. Luzes, chamas e sombras do modelo acompanham
+a posição. Pressione **L** novamente ou selecione **Desabilitar braço (L)**
+para ocultar o braço e deixar o candelabro na posição escolhida.
+
+O braço parte do canto inferior direito da câmera e acompanha a orientação e
+a posição do observador, mantendo a mão presa à haste. As luzes locais,
+incluindo cada chama do candelabro e os cones de luz, usam mapas de sombra
+em seis direções por fonte. Os mapas são reutilizados quando luzes e objetos
+permanecem imóveis; movimentos do braço, das peças e do pet os atualizam.
+
+As sombras principais também são reutilizadas enquanto a geometria e a
+projeção da luz permanecem iguais. Habilitar o braço sem movê-lo, movimentar
+apenas a câmera com o braço desligado ou variar o brilho das velas não força
+uma nova renderização dos mapas. A animação das peças e as mudanças reais
+de pose do pet invalidam os mapas correspondentes.
+
+Nas sombras locais, uma base de profundidade guarda a mesa, o candelabro e
+o bloco. A base é copiada sem perda de precisão antes de desenhar peças,
+pet e braço, evitando redesenhar os modelos estáticos durante animações.
+Cada luz mantém seu próprio estado de atualização. Essa base adicional usa
+aproximadamente 6 MiB por luz em armazenamento de profundidade de 32 bits,
+mantendo a resolução e a filtragem existentes.

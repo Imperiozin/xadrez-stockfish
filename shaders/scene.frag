@@ -72,7 +72,47 @@ vec3 directLighting(vec3 normal, vec3 viewDirection, vec3 lightDirection,
         + vec3(woodMaterial ? woodSpecularStrength : specularStrength) * specular);
 }
 
-vec3 localLighting(LocalLight light, vec3 normal, vec3 viewDirection, vec3 materialColor) {
+uniform sampler2DArrayShadow localShadowMap;
+uniform bool localShadowsEnabled;
+
+float localVisibility(int index, LocalLight light, vec3 normal) {
+    if (!localShadowsEnabled) return 1.0;
+    vec3 ray = worldPosition + normal * 0.01 - light.position;
+    vec3 magnitude = abs(ray);
+    float major;
+    vec2 uv;
+    int face;
+    // Same face orientations as the six depth views on the CPU.
+    if (magnitude.x >= magnitude.y && magnitude.x >= magnitude.z) {
+        major = magnitude.x;
+        face = ray.x >= 0.0 ? 0 : 1;
+        uv = vec2(ray.x >= 0.0 ? -ray.z : ray.z, -ray.y);
+    } else if (magnitude.y >= magnitude.z) {
+        major = magnitude.y;
+        face = ray.y >= 0.0 ? 2 : 3;
+        uv = vec2(ray.x, ray.y >= 0.0 ? ray.z : -ray.z);
+    } else {
+        major = magnitude.z;
+        face = ray.z >= 0.0 ? 4 : 5;
+        uv = vec2(ray.z >= 0.0 ? ray.x : -ray.x, -ray.y);
+    }
+    float nearPlane = min(0.05, light.range * 0.01);
+    if (major <= nearPlane) return 1.0;
+    uv = uv / major * 0.5 + 0.5;
+    float slope = 1.0 - max(dot(normal, normalize(-ray)), 0.0);
+    float distance = max(nearPlane, major - max(0.008, 0.025 * slope));
+    float reference = light.range / (light.range - nearPlane)
+        - light.range * nearPlane / ((light.range - nearPlane) * distance);
+    vec2 texel = 1.0 / vec2(textureSize(localShadowMap, 0).xy);
+    float visibility = 0.0;
+    for (int x = -1; x <= 1; ++x)
+        for (int y = -1; y <= 1; ++y)
+            visibility += texture(localShadowMap,
+                vec4(uv + vec2(x, y) * texel, float(index * 6 + face), reference));
+    return visibility / 9.0;
+}
+
+vec3 localLighting(int index, LocalLight light, vec3 normal, vec3 viewDirection, vec3 materialColor) {
     vec3 offset = light.position - worldPosition;
     float distanceSquared = dot(offset, offset);
     float relativeDistance = sqrt(distanceSquared) / light.range;
@@ -89,8 +129,11 @@ vec3 localLighting(LocalLight light, vec3 normal, vec3 viewDirection, vec3 mater
             ? smoothstep(light.outerCos, light.innerCos, angleCos)
             : step(light.outerCos, angleCos);
     }
+    // Back-facing surfaces and points outside the cone contribute no direct light.
+    // Skip the nine depth lookups without changing the resulting color.
+    if (dot(normal, direction) <= 0.0 || attenuation <= 0.0) return vec3(0.0);
     return directLighting(normal, viewDirection, direction, materialColor,
-                          light.color * light.intensity * attenuation);
+                          light.color * light.intensity * attenuation * localVisibility(index, light, normal));
 }
 
 float shadowAmount(vec3 normal, vec3 lightDirection, vec4 lightSpace,
@@ -178,7 +221,7 @@ void main() {
     }
 
     for (int i = 0; i < localLightCount; ++i)
-        litColor += localLighting(localLights[i], normal, viewDirection, materialColor);
+        litColor += localLighting(i, localLights[i], normal, viewDirection, materialColor);
     litColor += emissionColor;
 
     // A névoa aumenta com o quadrado da distância até a câmera.

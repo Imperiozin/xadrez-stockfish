@@ -85,6 +85,8 @@ void Shader::use(const Mat4 &vp, Vec3 eye) {
     glUniform1i(localLightCountLocation, 0);
     glUniform1i(glGetUniformLocation(id, "shadowsEnabled"), GL_FALSE);
     glUniform1i(glGetUniformLocation(id, "secondaryShadowsEnabled"), GL_FALSE);
+    glUniform1i(glGetUniformLocation(id, "localShadowsEnabled"), GL_FALSE);
+    glUniform1i(glGetUniformLocation(id, "localShadowMap"), 5);
     // Samplers of different types must use different units even in inactive branches.
     glUniform1i(glGetUniformLocation(id, "secondaryShadowMap"), 2);
     glUniform1i(glGetUniformLocation(id, "pageTexture"), 1);
@@ -209,5 +211,13 @@ void Shader::shadows(const Mat4 &lightViewProjection, Vec3 lightPosition, GLuint
     glUniform1i(glGetUniformLocation(id, secondary ? "secondaryShadowMap" : "shadowMap"), secondary ? 2 : 0);
     glActiveTexture(secondary ? GL_TEXTURE2 : GL_TEXTURE0);
     glBindTexture(GL_TEXTURE_2D, depthMap);
+    glActiveTexture(GL_TEXTURE0);
+}
+
+void Shader::localShadows(GLuint depthArray) {
+    glUniform1i(glGetUniformLocation(id, "localShadowsEnabled"), depthArray != 0);
+    glUniform1i(glGetUniformLocation(id, "localShadowMap"), 5);
+    glActiveTexture(GL_TEXTURE5);
+    glBindTexture(GL_TEXTURE_2D_ARRAY, depthArray);
     glActiveTexture(GL_TEXTURE0);
 }

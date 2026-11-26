@@ -291,7 +291,7 @@ void Notepad::focus(bool focused) {
     if (!focused) pressed = pointerOnPage = false;
 }
 
-Notepad::Action Notepad::renderInterface(float dt, int difficulty, bool disabled) {
+Notepad::Action Notepad::renderInterface(float dt, int difficulty, bool disabled, bool petEnabled, bool movingCandelabrum) {
     ContextScope scope(context);
     auto &io = ImGui::GetIO();
     io.DeltaTime = std::max(dt, .001f);
@@ -351,6 +351,9 @@ Notepad::Action Notepad::renderInterface(float dt, int difficulty, bool disabled
     };
     action.newGame = rightAlignedButton("Nova partida", 476);
     ImGui::EndDisabled();
+    action.togglePet = rightAlignedButton(petEnabled ? "Desabilitar pet" : "Habilitar pet", 552);
+    action.toggleCandelabrum = rightAlignedButton(
+        movingCandelabrum ? "Desabilitar braço (L)" : "Habilitar braço (L)", 628);
     action.close = rightAlignedButton("Fechar", canvasHeight - 88.f);
     ImGui::End();
     ImGui::Render();
